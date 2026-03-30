@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  artportal-web:
+    build: .
+    container_name: artportal_ai_server
+    restart: always
+    ports:
+      - "8502:8502"
+    volumes:
+      - ./dataset:/app/dataset
+      - ./history_db:/app/history_db
+      
+      # 👇 ยุบรวมการ Mount ไฟล์ Database และ AI ทั้งหมดมาไว้ที่โฟลเดอร์เดียว
+      - ./data:/app/data
+      
+    environment:
+      - TZ=Asia/Bangkok

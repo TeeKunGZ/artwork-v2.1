@@ -1,0 +1,19 @@
+.git
+.gitignore
+.dockerignore
+.env
+.venv
+venv/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+
+# ข้อมูลที่ควรให้ Volume จัดการแทน
+dataset/
+history_db/
+*.db
+faiss_index.bin
+faiss_labels.json
+*.xlsx
+!Templates.xlsx

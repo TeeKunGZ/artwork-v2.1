@@ -1,0 +1,34 @@
+# Environments
+.env
+.venv
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Database & Data (ไม่เอาข้อมูลจริงขึ้น Git)
+*.db
+artportal.db
+crop_memory.db
+dataset/
+history_db/
+
+# AI Models & Indexes
+faiss_index.bin
+faiss_labels.json
+.easyocr/
+.cache/
+
+# Excel Reports (เอาแค่ Template ขึ้นไป)
+*.xlsx
+!Templates.xlsx
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

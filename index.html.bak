@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artwork Mapping Portal V1.0 (Enterprise)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .col-card { transition: all 0.2s; cursor: pointer; }
+        .col-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-color: #818cf8; }
+        .col-card.selected { background-color: #eef2ff; border-color: #4f46e5; box-shadow: 0 0 0 2px #c7d2fe; transform: translateY(-2px); }
+        .rec-card { transition: all 0.2s; cursor: pointer; }
+        .rec-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-color: #fbbf24; }
+        .rec-card.selected { background-color: #fffbeb; border-color: #d97706; box-shadow: 0 0 0 2px #fde68a; transform: translateY(-2px); }
+        .artboard-card { transition: all 0.2s; }
+        .artboard-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #818cf8; }
+        .preview-bg { background-color: #f3f4f6; background-image: linear-gradient(45deg,#e5e7eb 25%,transparent 25%,transparent 75%,#e5e7eb 75%,#e5e7eb),linear-gradient(45deg,#e5e7eb 25%,transparent 25%,transparent 75%,#e5e7eb 75%,#e5e7eb); background-size: 10px 10px; background-position: 0 0,5px 5px; }
+        .file-input-hidden { display: none; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .highlight-pulse { animation: pulse-border 1.5s ease-out; }
+        @keyframes pulse-border { 0% { box-shadow: 0 0 0 0 rgba(79,70,229,0.7); } 70% { box-shadow: 0 0 0 15px rgba(79,70,229,0); } 100% { box-shadow: 0 0 0 0 rgba(79,70,229,0); } }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .tool-btn.active { background-color: #eef2ff; color: #4f46e5; border-color: #c7d2fe; }
+        
+        /* 🔥 กู้คืน CSS สำหรับเส้นกากบาทสีชมพู */
+        .crosshair-h, .crosshair-v {
+            position: absolute;
+            background-color: #FF00FF;
+            pointer-events: none;
+            z-index: 9999;
+            display: none;
+        }
+        .crosshair-h { height: 1px; width: 100%; left: 0; }
+        .crosshair-v { width: 1px; height: 100%; top: 0; }
+        #cropper-container.crosshair-active { cursor: crosshair; }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden text-slate-800">
+
+<div id="customDialogOverlay" class="hidden fixed inset-0 bg-slate-900/60 z-[10500] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+    <div id="customAlertBox" class="hidden bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
+        <div id="customAlertIcon" class="mb-4"></div>
+        <h3 id="customAlertTitle" class="text-lg font-bold mb-2"></h3>
+        <p id="customAlertMessage" class="text-sm text-slate-500 mb-6 leading-relaxed"></p>
+        <button id="customAlertBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition shadow-md">ตกลง</button>
+    </div>
+    <div id="customConfirmBox" class="hidden bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-amber-100 mb-4"><i class="fa-solid fa-circle-question text-amber-600 text-2xl"></i></div>
+        <h3 id="customConfirmTitle" class="text-lg font-bold text-slate-800 mb-2"></h3>
+        <p id="customConfirmMessage" class="text-sm text-slate-500 mb-6 leading-relaxed"></p>
+        <div class="flex gap-3">
+            <button id="customConfirmCancel" class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold py-2.5 rounded-xl transition shadow-sm">ยกเลิก</button>
+            <button id="customConfirmOk" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition shadow-md">ยืนยัน</button>
+        </div>
+    </div>
+    <div id="customPromptBox" class="hidden bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 mb-4"><i class="fa-solid fa-keyboard text-indigo-600 text-xl"></i></div>
+        <h3 id="customPromptTitle" class="text-lg font-bold text-slate-800 mb-2"></h3>
+        <p id="customPromptMessage" class="text-sm text-slate-500 mb-4"></p>
+        <input type="text" id="customPromptInput" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none mb-6 text-center font-bold" autocomplete="off">
+        <div class="flex gap-3">
+            <button id="customPromptCancel" class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold py-2.5 rounded-xl transition shadow-sm">ยกเลิก</button>
+            <button id="customPromptOk" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition shadow-md">ตกลง</button>
+        </div>
+    </div>
+</div>
+
+<datalist id="masterTeamList"></datalist>
+
+<div id="loginModal" class="fixed inset-0 bg-slate-900 z-[10000] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-200">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 text-indigo-600 mb-4"><i class="fa-solid fa-layer-group text-3xl"></i></div>
+            <h2 class="text-2xl font-black text-slate-800">ArtPortal System</h2>
+            <p class="text-sm text-slate-500 mt-1">ลงชื่อเข้าใช้เพื่อเข้าสู่พื้นที่ทำงานของทีม</p>
+        </div>
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">รหัสพนักงาน (Employee ID)</label>
+                <div class="relative"><i class="fa-solid fa-user absolute left-4 top-3 text-slate-400"></i><input type="text" id="loginEmpId" required class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition" placeholder="เช่น EMP001"></div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">รหัสผ่าน (Password)</label>
+                <div class="relative"><i class="fa-solid fa-lock absolute left-4 top-3 text-slate-400"></i><input type="password" id="loginPassword" required class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition" placeholder="••••••••"></div>
+            </div>
+            <div id="loginError" class="hidden text-xs text-red-500 font-bold bg-red-50 p-2 rounded text-center"></div>
+            <button type="submit" id="btnLogin" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow-md flex justify-center items-center">เข้าสู่ระบบ <i class="fa-solid fa-arrow-right-to-bracket ml-2"></i></button>
+        </form>
+    </div>
+</div>
+
+<div id="changePasswordModal" class="hidden fixed inset-0 bg-slate-900/60 z-[9500] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-200">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+            <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-key text-indigo-500 mr-2"></i> เปลี่ยนรหัสผ่าน</h3>
+            <button onclick="closeChangePasswordModal()" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <form id="changePasswordForm" class="space-y-4">
+            <div><label class="block text-xs font-bold text-slate-700 mb-1">รหัสผ่านเดิม</label><input type="password" id="cpOldPassword" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+            <div><label class="block text-xs font-bold text-slate-700 mb-1">รหัสผ่านใหม่</label><input type="password" id="cpNewPassword" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"></div>
+            <div id="cpError" class="hidden text-xs text-red-500 font-bold text-center"></div>
+            <button type="submit" id="btnChangePassword" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg transition shadow-md">ยืนยันการเปลี่ยนรหัสผ่าน</button>
+        </form>
+    </div>
+</div>
+
+<div id="adminModal" class="hidden fixed inset-0 bg-slate-900/60 z-[9000] flex flex-col items-center justify-center backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+        
+        <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+            <div class="flex items-center gap-6">
+                <h3 class="text-lg font-bold text-slate-800 border-r pr-6"><i class="fa-solid fa-gears text-indigo-600 mr-2"></i> จัดการระบบ (Admin)</h3>
+                <div class="flex gap-2">
+                    <button id="tabUsersBtn" onclick="switchAdminTab('users')" class="px-4 py-2 rounded-lg font-bold text-sm bg-indigo-100 text-indigo-700 transition">👥 จัดการผู้ใช้งาน</button>
+                    <button id="tabTeamsBtn" onclick="switchAdminTab('teams')" class="px-4 py-2 rounded-lg font-bold text-sm text-slate-500 hover:bg-slate-100 transition">🏢 จัดการชื่อทีม (Master)</button>   
+                    <div class="w-px h-6 bg-slate-300 mx-2 self-center"></div>
+                    <button onclick="trainAIModel()" class="px-4 py-2 rounded-lg font-bold text-sm bg-violet-100 text-violet-700 hover:bg-violet-200 border border-violet-200 shadow-sm transition flex items-center transform hover:scale-105">
+                        <i class="fa-solid fa-brain mr-2"></i> สั่งเทรน AI (อัปเดตสมอง)
+                    </button>
+                </div>
+            </div>
+            <button onclick="closeAdminModal()" class="text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-2xl"></i></button>
+        </div>
+        
+        <div id="adminTabUsers" class="flex-1 overflow-y-auto p-6 bg-slate-50/50 flex flex-col xl:flex-row gap-6">
+            <div class="w-full xl:w-1/3 bg-white border border-slate-200 p-5 rounded-xl shadow-sm h-fit">
+                <h4 class="font-bold text-sm text-slate-800 mb-4 border-b pb-2"><i class="fa-solid fa-user-plus text-indigo-500 mr-1"></i> เพิ่มผู้ใช้งานใหม่</h4>
+                <form id="addUserForm" class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">รหัสพนักงาน *</label>
+                            <input type="text" id="addEmpId" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">รหัสผ่าน *</label>
+                            <input type="password" id="addPassword" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">ชื่อ *</label>
+                            <input type="text" id="addFirstName" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">นามสกุล</label>
+                            <input type="text" id="addLastName" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">ชื่อทีม (จาก Master) *</label>
+                            <select id="addTeamName" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none bg-white">
+                                <option value="">-- เลือกทีม --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-span-2">
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">สิทธิ์การใช้งาน</label>
+                            <input type="hidden" id="addRole" value="user">
+                            <div class="flex gap-2">
+                                <button type="button" onclick="setRoleUI('add', 'user')" id="btn-addRole-user" class="flex-1 py-1.5 px-3 rounded-lg text-sm font-bold border transition-all bg-indigo-50 border-indigo-400 text-indigo-700 ring-1 ring-indigo-400 shadow-sm"><i class="fa-solid fa-user mr-1"></i> User (ทั่วไป)</button>
+                                <button type="button" onclick="setRoleUI('add', 'admin')" id="btn-addRole-admin" class="flex-1 py-1.5 px-3 rounded-lg text-sm font-bold border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-all"><i class="fa-solid fa-user-shield mr-1"></i> Admin (ผู้ดูแล)</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" id="btnAddUser" class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg text-sm transition shadow-sm">เพิ่มบัญชีนี้ลงระบบ</button>
+                </form>
+            </div>
+
+            <div class="w-full xl:w-2/3 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[700px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider">
+                                <th class="p-3 border-b border-slate-200">รหัสพนง.</th>
+                                <th class="p-3 border-b border-slate-200">ชื่อ - นามสกุล (ทีม)</th>
+                                <th class="p-3 border-b border-slate-200 text-center">สิทธิ์ / สถานะ</th>
+                                <th class="p-3 border-b border-slate-200 text-center w-40">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminUsersList" class="text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="adminTabTeams" class="hidden flex-1 overflow-y-auto p-6 bg-slate-50/50 flex flex-col xl:flex-row gap-6">
+            <div class="w-full xl:w-1/3 bg-white border border-slate-200 p-5 rounded-xl shadow-sm h-fit">
+                <h4 class="font-bold text-sm text-slate-800 mb-4 border-b pb-2"><i class="fa-solid fa-building text-indigo-500 mr-1"></i> เพิ่มชื่อทีมใหม่ (Master)</h4>
+                <form id="addTeamForm" class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase">พิมพ์ชื่อทีมที่ต้องการ *</label>
+                        <input type="text" id="addTeamNameInput" required placeholder="เช่น Graphic Team C" class="w-full mt-1 border border-slate-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <button type="submit" id="btnAddTeam" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-sm transition shadow-sm flex justify-center items-center">
+                        <i class="fa-solid fa-plus mr-2"></i> บันทึกชื่อทีม
+                    </button>
+                </form>
+            </div>
+            
+            <div class="w-full xl:w-2/3 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col h-fit">
+                <div class="px-5 py-3 border-b border-slate-200 bg-slate-50">
+                    <h4 class="font-bold text-sm text-slate-800">รายชื่อทีมในระบบปัจจุบัน</h4>
+                </div>
+                <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-3" id="adminTeamsList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="editUserModal" class="hidden fixed inset-0 bg-slate-900/60 z-[9500] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-slate-200">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+            <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-user-pen text-indigo-500 mr-2"></i> แก้ไขข้อมูลผู้ใช้งาน</h3>
+            <button onclick="closeEditUserModal()" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <form id="editUserForm" class="space-y-4">
+            <input type="hidden" id="editEmpId">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">ชื่อ *</label>
+                    <input type="text" id="editFirstName" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">นามสกุล</label>
+                    <input type="text" id="editLastName" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">ชื่อทีม *</label>
+                    <select id="editTeamName" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-1 focus:ring-indigo-500 outline-none bg-white"></select>
+                </div>
+                
+                <div class="col-span-2">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">สิทธิ์การใช้งาน</label>
+                    <input type="hidden" id="editRole" value="user">
+                    <div class="flex gap-2">
+                        <button type="button" onclick="setRoleUI('edit', 'user')" id="btn-editRole-user" class="flex-1 py-1.5 px-3 rounded-lg text-sm font-bold border transition-all bg-indigo-50 border-indigo-400 text-indigo-700 ring-1 ring-indigo-400 shadow-sm"><i class="fa-solid fa-user mr-1"></i> User (ทั่วไป)</button>
+                        <button type="button" onclick="setRoleUI('edit', 'admin')" id="btn-editRole-admin" class="flex-1 py-1.5 px-3 rounded-lg text-sm font-bold border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-all"><i class="fa-solid fa-user-shield mr-1"></i> Admin (ผู้ดูแล)</button>
+                    </div>
+                </div>
+
+            </div>
+            <button type="submit" id="btnSubmitEditUser" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg transition shadow-md">บันทึกการแก้ไข</button>
+        </form>
+    </div>
+</div>
+
+<div id="fullScreenLoader" class="hidden fixed inset-0 bg-slate-900/80 z-[9999] flex flex-col items-center justify-center backdrop-blur-sm transition-opacity">
+    <i class="fa-solid fa-circle-notch fa-spin text-6xl text-indigo-400 mb-5"></i>
+    <h2 id="loaderText" class="text-2xl font-bold text-white tracking-wider">กำลังประมวลผล...</h2>
+    <p class="text-indigo-200 mt-2 text-sm">กรุณารอสักครู่ ระบบกำลังจัดการข้อมูลให้คุณ</p>
+</div>
+
+<aside class="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-20">
+    <div class="h-16 flex items-center px-6 border-b border-slate-800">
+        <i class="fa-solid fa-layer-group text-indigo-400 text-2xl mr-3"></i>
+        <span class="text-xl font-bold tracking-wide">Art<span class="text-indigo-400">Portal</span></span>
+    </div>
+    <nav class="flex-1 py-6 px-3 space-y-2">
+        <a href="#" class="flex items-center px-4 py-3 bg-indigo-600 text-white rounded-lg shadow-md transition"><i class="fa-solid fa-wand-magic-sparkles w-6"></i> Strike Off Mapping</a>
+        <a href="#" id="btnAdminMenu" onclick="openAdminModal()" class="hidden flex items-center px-4 py-3 bg-slate-800 text-indigo-300 hover:bg-slate-700 hover:text-white rounded-lg transition mt-2 border border-slate-700"><i class="fa-solid fa-users-gear w-6"></i> จัดการระบบ (Admin)</a>
+    </nav>
+    <div class="p-4 border-t border-slate-800 bg-slate-800/50">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center font-bold shadow-inner" id="userInitial">A</div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-bold truncate text-white" id="userNameDisplay">Loading...</p>
+                <p class="text-[10px] text-indigo-300 truncate" id="userTeamDisplay">...</p>
+            </div>
+            <button onclick="openChangePasswordModal()" class="text-slate-400 hover:text-indigo-400 transition p-1" title="เปลี่ยนรหัสผ่านตัวเอง"><i class="fa-solid fa-key"></i></button>
+            <button onclick="logout()" class="text-slate-400 hover:text-red-400 transition p-1" title="ออกจากระบบ"><i class="fa-solid fa-power-off"></i></button>
+        </div>
+    </div>
+</aside>
+
+<div class="flex-1 flex flex-col overflow-hidden relative">
+    <header class="h-16 bg-white shadow-sm flex items-center justify-between px-8 z-10">
+        <div class="flex items-center text-sm text-slate-500 font-medium">
+            <span class="text-slate-800 font-bold">Strike Off Mapping Studio <span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded ml-2">V1.0 (Enterprise)</span></span>
+        </div>
+        <div id="cacheCounter" class="hidden items-center bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-full text-sm font-bold border border-indigo-200 shadow-sm"><i class="fa-solid fa-memory mr-2"></i> บันทึกลงระบบแล้ว <span id="fileCountVal" class="mx-1 text-lg">0</span> ไฟล์</div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-8" id="mainScrollArea">
+        <div class="max-w-7xl mx-auto space-y-8">
+            <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center"><span class="bg-indigo-100 text-indigo-600 w-7 h-7 rounded-full flex items-center justify-center mr-3 text-sm">1</span> Upload Files</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div id="excelUploadBox" class="border-2 border-dashed border-slate-300 bg-slate-50/50 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-emerald-400 hover:bg-emerald-50 cursor-pointer transition-all duration-300 h-full min-h-[160px] group" onclick="document.getElementById('excelFile').click()">
+                        <input type="file" id="excelFile" accept=".xlsx" class="file-input-hidden">
+                        <div id="excelIcon" class="w-12 h-12 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition shadow-sm"><i class="fa-solid fa-file-excel"></i></div>
+                        <h3 class="text-sm font-bold text-slate-700 mb-1" id="excelTitle">Upload Excel Template</h3>
+                        <span id="excelFileName" class="text-xs font-semibold text-emerald-700 bg-emerald-100/50 border border-emerald-200 px-3 py-1 rounded-full hidden max-w-[90%] truncate"></span>
+                        <div id="autoLoadStatus" class="text-[10px] mt-2 font-bold italic text-slate-400 hidden"></div>
+                    </div>
+                    <div id="aiUploadBox" class="border-2 border-dashed border-slate-300 bg-slate-50/50 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-indigo-400 hover:bg-indigo-50 cursor-pointer transition-all duration-300 h-full min-h-[160px] group" onclick="document.getElementById('aiFiles').click()">
+                        <input type="file" id="aiFiles" accept=".ai" class="file-input-hidden">
+                        <div id="aiIcon" class="w-12 h-12 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition shadow-sm"><i class="fa-solid fa-bezier-curve"></i></div>
+                        <h3 class="text-sm font-bold text-slate-700 mb-1" id="aiTitle">Upload Artwork File (.ai)</h3>
+                        <span id="aiFileName" class="text-xs font-semibold text-indigo-700 bg-indigo-100/50 border border-indigo-200 px-3 py-1 rounded-full hidden max-w-[90%] truncate"></span>
+                    </div>
+                </div>
+                <div class="mt-5 flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-lg"><i class="fa-solid fa-brain"></i></div>
+                        <div>
+                            <h4 class="text-sm font-bold text-slate-800">โหมดผู้ช่วย AI (AI Assistant)</h4>
+                            <p class="text-[10px] text-slate-500 mt-0.5">เปิดใช้ระบบ OCR อ่านข้อความจากรูป และ AI ค้นหาชิ้นส่วนอัตโนมัติ (อาจใช้เวลาประมวลผลนานขึ้น)</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="toggleAiMode" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 shadow-inner"></div>
+                    </label>
+                </div>
+                <div class="mt-5 flex justify-end gap-3">
+                    <button id="btnClear" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 font-bold py-2.5 px-5 rounded-lg text-sm transition shadow-sm flex items-center"><i class="fa-solid fa-trash-can mr-2"></i> ล้างข้อมูล (Clear)</button>
+                    <button id="btnStart" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg text-sm shadow-md transition flex items-center"><i class="fa-solid fa-folder-open mr-2"></i> ดึงข้อมูลมาเริ่มทำงาน</button>
+                </div>
+            </section>
+
+            <section id="textDataWorkspace" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center justify-between">
+                    <div class="flex items-center"><span class="bg-indigo-100 text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">2</span> Extracted Garment Info <span class="text-xs text-slate-500 font-normal ml-2">(ไฟล์ที่กำลังทำอยู่ตอนนี้)</span></div>
+                    <span id="recordCountBadge" class="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold shadow-sm">Found 0 Records</span>
+                </h2>
+                <div id="recordCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pb-2"></div>
+                <div id="detectedColorsStrip" class="hidden mt-4 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs font-bold text-violet-700 flex items-center"><i class="fa-solid fa-wand-sparkles mr-2"></i> สีที่ดึงมาจากไฟล์ .AI <span class="text-[10px] text-violet-500 ml-2 font-normal">(กดไอคอนกระดาษเพื่อ Copy หรือคลิกเลือกจาก Dropdown ได้เลย)</span></p>
+                    </div>
+                    <div id="detectedColorsList" class="flex flex-wrap gap-2"></div>
+                </div>
+                <div id="autoMappedSection" class="hidden mt-6 border-t border-slate-200 pt-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="flex items-center cursor-pointer group select-none" onclick="toggleAutoMappedSection()" title="คลิกเพื่อพับเก็บ/ขยาย">
+                            <h3 class="text-sm font-bold text-emerald-600 group-hover:text-emerald-700 flex items-center transition"><i class="fa-solid fa-magic-wand-sparkles mr-2"></i> ระบบดึงรูปจากประวัติมาใช้ซ้ำอัตโนมัติ (Auto-Loaded) <i id="autoMappedToggleIcon" class="fa-solid fa-chevron-up ml-2 text-emerald-400 group-hover:text-emerald-600 transition"></i></h3>
+                            <span id="autoMappedCountBadge" class="ml-3 bg-emerald-100 text-emerald-700 text-[10px] px-2.5 py-0.5 rounded-full font-bold hidden shadow-sm transition"></span>
+                        </div>
+                    </div>
+                    <div id="autoMappedContentWrapper" class="transition-all duration-300 origin-top">
+                        <div id="autoMappedList" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="mainWorkspace" class="hidden space-y-8">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center"><span class="bg-indigo-100 text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">3</span> Artboards Gallery</h2>
+                    <div id="artboardList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6"></div>
+                </div>
+
+                <div id="cropArea" class="hidden bg-white p-6 rounded-2xl shadow-lg border border-indigo-100 ring-1 ring-indigo-50">
+                    <div class="flex flex-col xl:flex-row gap-6">
+                        <div class="w-full xl:w-7/12 flex flex-col min-w-0 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-inner relative">
+                            <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center z-10">
+                                <span id="artboardDisplay" class="font-bold text-indigo-700">Artboard X</span>
+                                <span id="aiStatusBadge" class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full font-bold shadow-sm flex items-center"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Preparing AI...</span>
+                            </div>
+                            <div class="bg-slate-50 border-b border-slate-200 px-3 py-2 flex flex-wrap items-center justify-between gap-2 z-10 shadow-sm relative">
+                                <div class="flex items-center gap-1.5">
+                                    <button id="btnToolCrop" onclick="cropperAction('crop')" class="tool-btn active flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 transition shadow-sm"><i class="fa-solid fa-crop-simple mr-1.5"></i> ลากกรอบ</button>
+                                    <button id="btnToolMove" onclick="cropperAction('move')" class="tool-btn flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 transition shadow-sm"><i class="fa-solid fa-hand mr-1.5"></i> เลื่อนภาพ</button>
+                                    <div class="w-px h-6 bg-slate-300 mx-1"></div>
+                                    <button onclick="restoreLastCrop()" class="flex items-center px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition shadow-sm" title="วางกรอบเดิมที่เพิ่งตัดไป"><i class="fa-solid fa-paste mr-1.5"></i> วางพิกัดเดิม</button>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <button onclick="cropperAction('zoom_in')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition shadow-sm"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                                    <button onclick="cropperAction('zoom_out')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition shadow-sm"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                                    <button onclick="cropperAction('reset')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition shadow-sm"><i class="fa-solid fa-expand"></i></button>
+                                    <div class="w-px h-6 bg-slate-300 mx-1"></div>
+                                    <button id="btnCrosshair" onclick="toggleCrosshair()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-pink-600 hover:bg-pink-50 hover:border-pink-200 transition shadow-sm"><i class="fa-solid fa-crosshairs"></i></button>
+                                </div>
+                            </div>
+                            
+                            <div id="detectedObjectsPanel" class="hidden bg-indigo-50/50 border-b border-indigo-100 px-3 py-2 shadow-inner">
+                                <div class="flex items-center gap-3 overflow-x-auto pb-1" id="detectedObjectsList"></div>
+                            </div>
+                            
+                            <div id="cropper-container" class="flex-1 preview-bg flex items-center justify-center relative min-h-[500px] overflow-hidden group">
+                                <div class="crosshair-h" id="crossLineH"></div>
+                                <div class="crosshair-v" id="crossLineV"></div>
+                                <img id="imageToCrop" src="" style="display:block;max-width:100%">
+                            </div>
+                        </div>
+
+                        <div class="w-full xl:w-5/12 flex flex-col min-w-0 border-t xl:border-t-0 xl:border-l border-slate-200 pt-6 xl:pt-0 xl:pl-6 py-2">
+                            <div id="cropSnapAlert" class="hidden mb-3 transition-all duration-300">
+                                <div id="cropSnapAlertInner" class="px-3 py-2 rounded-lg text-xs font-bold flex items-center shadow-sm">
+                                    <i id="cropSnapIcon" class="mr-2"></i><span id="cropSnapText"></span>
+                                </div>
+                            </div>
+
+                            <div class="mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
+                                <h3 class="text-sm font-bold text-slate-800 mb-2"><i class="fa-solid fa-ruler-combined text-indigo-500 mr-1"></i> ข้อมูลขนาดจริงบนไฟล์ .AI (cm.)</h3>
+                                <div class="flex gap-2 items-center">
+                                    <div class="flex-1 flex items-center border border-slate-300 rounded-lg px-2 py-1.5 bg-white focus-within:ring-2 focus-within:ring-indigo-500 transition"><span class="text-xs text-slate-400 font-bold mr-1">W:</span><input type="number" step="0.01" id="cropWidthCm" class="w-full text-sm text-indigo-700 outline-none bg-transparent font-bold text-center" placeholder="กว้าง"><span class="text-xs text-slate-400 ml-1">cm</span></div>
+                                    <label class="text-indigo-600 hover:text-indigo-800 cursor-pointer bg-white border border-slate-200 p-1.5 rounded shadow-sm"><input type="checkbox" id="chkLockRatio" class="hidden" checked><i id="iconLockRatio" class="fa-solid fa-link"></i></label>
+                                    <div class="flex-1 flex items-center border border-slate-300 rounded-lg px-2 py-1.5 bg-white focus-within:ring-2 focus-within:ring-indigo-500 transition"><span class="text-xs text-slate-400 font-bold mr-1">H:</span><input type="number" step="0.01" id="cropHeightCm" class="w-full text-sm text-indigo-700 outline-none bg-transparent font-bold text-center" placeholder="สูง"><span class="text-xs text-slate-400 ml-1">cm</span></div>
+                                </div>
+                                <p class="text-[10px] text-slate-500 mt-2 text-center">* พิมพ์ตัวเลขเพื่อแก้ขนาดกรอบได้โดยตรง <span class="font-bold text-indigo-500">(ใช้ ⬅️⬆️⬇️➡️ ที่คีย์บอร์ดเลื่อนกรอบได้)</span></p>
+                            </div>
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="text-sm font-bold text-slate-800 flex items-center">1. Select Fabric Color</h3>
+                                    <div class="flex gap-2">
+                                        <button id="btnSelectAllColors" class="text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded shadow-sm flex items-center gap-1 hover:bg-indigo-100 transition"><i class="fa-solid fa-check-double"></i> เลือกทั้งหมด</button>
+                                        <button id="btnToggleLock" class="text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200 px-2 py-1 rounded shadow-sm flex items-center gap-1 hover:bg-slate-200 transition"><i id="lockIcon" class="fa-solid fa-unlock"></i> <span id="lockText">Auto-Clear</span></button>
+                                    </div>
+                                </div>
+                                <div id="recordButtonGroup" class="grid grid-cols-2 gap-2 overflow-y-auto max-h-32 pr-1 py-1"></div>
+                            </div>
+                            <div class="mb-4">
+                                <h3 class="text-sm font-bold text-slate-800 mb-2">2. Select Target Column <span class="text-[10px] font-normal text-slate-400 ml-1">(กดแป้น 1-9 เพื่อเลือกได้)</span></h3>
+                                <div id="columnButtonGroup" class="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-2 overflow-y-auto max-h-48 pr-1 py-1"></div>
+                            </div>
+                            <button id="btnAddCrop" class="w-full bg-indigo-600 text-white px-4 py-4 rounded-xl font-bold hover:bg-indigo-700 shadow-md transition flex justify-center items-center mb-4 text-base transform hover:-translate-y-1"><i class="fa-solid fa-scissors mr-2"></i> ตัดรูปส่งเข้า Excel <span class="ml-2 text-xs font-normal opacity-80">(Press Enter)</span></button>
+                            <div class="flex flex-col h-32 border-t pt-4">
+                                <h3 class="text-xs font-bold text-slate-800 mb-2">📦 Mapped Images (Artboard นี้)</h3>
+                                <div id="mappedItemsList" class="flex flex-col gap-2 overflow-y-auto pr-2 flex-1"></div>
+                            </div>
+                            <div class="flex gap-3 mt-4">
+                                <button id="btnMarkArtboardDone" onclick="markCurrentArtboardDone()" class="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-2.5 rounded-xl text-sm font-bold transition shadow-sm flex justify-center items-center"><i class="fa-solid fa-check-double mr-2"></i> หน้านี้เคลียร์แล้ว</button>
+                                <button id="btnFinishArtboard" onclick="closeCropperWorkspace()" class="flex-1 bg-white text-slate-500 border border-slate-300 px-3 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 hover:text-slate-700 transition shadow-sm flex justify-center items-center"><i class="fa-solid fa-chevron-up mr-2"></i> พับเก็บ</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div id="exportWorkspace" class="hidden bg-white px-6 py-5 rounded-xl shadow-sm border border-slate-200 mt-6 mb-10 flex flex-col lg:flex-row gap-4 justify-between items-center transition-all">
+                <div class="text-left w-full lg:w-auto">
+                    <h3 class="text-base font-bold text-slate-800 mb-1 flex items-center" id="exportPanelTitle"><i class="fa-solid fa-flag-checkered text-indigo-500 mr-2"></i> ทำไฟล์นี้เสร็จแล้วใช่ไหม?</h3>
+                    <p class="text-xs text-slate-500" id="exportPanelDesc">บันทึกเพื่อเคลียร์หน้าจอและไปอัปโหลดไฟล์ถัดไป หรือกด Export ทีเดียวตอนจบงานได้เลย</p>
+                </div>
+                <div class="flex flex-wrap gap-3 w-full lg:w-auto justify-end">
+                    <button id="btnSaveProgress" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-5 py-2.5 rounded-lg text-sm font-bold transition flex items-center shadow-sm whitespace-nowrap"><i class="fa-solid fa-floppy-disk mr-2"></i> บันทึกงานไฟล์นี้ลงระบบ</button>
+                    <button id="btnGenerateZip" class="bg-violet-500 hover:bg-violet-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow-sm transition transform hover:-translate-y-0.5 flex items-center whitespace-nowrap"><i class="fa-solid fa-file-zipper mr-2"></i> Download ZIP</button>
+                    <button id="btnGenerateExcel" class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-lg text-sm font-bold shadow-sm shadow-emerald-200 transition transform hover:-translate-y-0.5 flex items-center whitespace-nowrap"><i class="fa-solid fa-file-export mr-2"></i> Export All to Excel</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="exportPreviewModal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-11/12 max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+            <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-list-check text-indigo-600 mr-2"></i> สรุปข้อมูลก่อน Export (Pre-flight Check)</h3>
+            <button onclick="closeExportPreview()" class="text-slate-400 hover:text-red-500 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+        <div class="p-6 overflow-y-auto flex-1 bg-slate-50/50"><div id="exportPreviewContent"></div></div>
+        <div class="px-6 py-4 border-t border-slate-200 bg-white flex justify-end gap-3">
+            <button onclick="closeExportPreview()" class="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 transition shadow-sm">ยกเลิก (กลับไปแก้ไข)</button>
+            <button id="btnConfirmExport" class="px-8 py-2.5 rounded-xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-md flex items-center"><i class="fa-solid fa-file-export mr-2"></i> ยืนยัน Export Excel</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/state.js"></script>
+<script src="js/api.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/cropper-tool.js"></script>
+<script src="js/upload.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

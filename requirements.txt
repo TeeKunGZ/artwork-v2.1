@@ -1,0 +1,40 @@
+# == Web Framework =============================================================
+fastapi
+uvicorn[standard]
+python-multipart
+
+# == Auth ======================================================================
+# ใช้ bcrypt โดยตรง (ไม่ใช้ passlib เพื่อหลีกเลี่ยง compatibility issues)
+bcrypt>=4.0.0
+PyJWT
+
+# == Database ==================================================================
+sqlalchemy
+pydantic-settings
+
+# == PDF & Image ===============================================================
+PyMuPDF
+pdfminer.six
+Pillow
+openpyxl
+opencv-python-headless
+
+# == OCR =======================================================================
+# Stage 1: PDFMiner (อยู่ข้างบนแล้ว)
+# Stage 2: Tesseract — ติดตั้ง binary แยก แล้วค่อย pip install pytesseract
+#   Windows: https://github.com/UB-Mannheim/tesseract/wiki
+#   macOS:   brew install tesseract
+#   Linux:   sudo apt install tesseract-ocr
+pytesseract
+# Stage 3: EasyOCR (heavy fallback)
+easyocr
+
+thefuzz
+python-Levenshtein
+
+# == AI / ML ===================================================================
+# !! ต้องใช้ Python 3.11 เท่านั้น — Python 3.14 ยัง NOT supported !!
+torch
+torchvision
+faiss-cpu
+numpy
