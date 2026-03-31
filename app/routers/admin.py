@@ -54,7 +54,7 @@ async def list_users(
 ):
     cols = ["emp_id", "first_name", "last_name", "team_name", "role", "is_active", "last_login"]
     return [
-        {c: str(getattr(u, c)) if c == "last_login" and getattr(u, c) else getattr(u, c)
+        {c: getattr(u, c).isoformat() if c == "last_login" and getattr(u, c) else getattr(u, c)
          for c in cols}
         for u in crud.get_all_users(db)
     ]
@@ -136,5 +136,10 @@ async def reset_password(
     db: Session = Depends(get_db),
     _: dict = Depends(get_admin_user),
 ):
+    if len(new_password) < 8:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร"},
+        )
     crud.set_password(db, target_emp_id, new_password)
     return {"status": "success"}

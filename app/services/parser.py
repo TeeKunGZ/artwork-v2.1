@@ -40,7 +40,9 @@ def _stream_text_tokens(stream_data: bytes) -> list[str]:
         try:
             tokens: list[str] = []
             pattern = r"\[([^\]]+)\]\s*TJ|\(([^)\\]*(?:\\.[^)\\]*)*)\)\s*Tj"
-            raw = zlib.decompress(stream_data[offset:], -15).decode("latin-1", errors="replace")
+            decompressor = zlib.decompressobj(-15)
+            raw_bytes = decompressor.decompress(stream_data[offset:], max_length=10 * 1024 * 1024)
+            raw = raw_bytes.decode("latin-1", errors="replace")
             for m in re.finditer(pattern, raw):
                 if m.group(1):
                     tokens.append(

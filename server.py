@@ -70,6 +70,12 @@ app.include_router(ai.router,     prefix="/api/ai")
 app.include_router(export.router, prefix="/api")
 
 
+# ── Health check ──────────────────────────────────────────────────────────────
+@app.get("/api/health", tags=["System"])
+async def health_check():
+    return {"status": "ok"}
+
+
 # ── Frontend SPA ──────────────────────────────────────────────────────────────
 @app.get("/")
 async def serve_frontend():

@@ -31,7 +31,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # สร้างโฟลเดอร์ที่จำเป็น ป้องกัน Error (เผื่อลืม Mount)
-RUN mkdir -p dataset history_db
+RUN mkdir -p dataset history_db data
+
+# สร้าง non-root user เพื่อความปลอดภัย
+RUN useradd -m -s /bin/bash appuser && chown -R appuser:appuser /app
+USER appuser
 
 # เปิด Port 8502
 EXPOSE 8502

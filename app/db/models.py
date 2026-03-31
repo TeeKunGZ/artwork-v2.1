@@ -12,6 +12,7 @@ class User(Base):
     team_name     = Column(String, default="")
     role          = Column(String, default="user")   # "user" | "admin"
     is_active     = Column(Integer, default=1)
+    must_change_password = Column(Integer, default=0)
     last_login    = Column(DateTime, nullable=True)
 
 

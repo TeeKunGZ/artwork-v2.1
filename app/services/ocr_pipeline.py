@@ -11,7 +11,9 @@ import hashlib
 import io
 import os
 import shutil
+import threading
 import time
+from collections import OrderedDict
 from typing import TypedDict
 
 import cv2
@@ -36,8 +38,20 @@ class TextBlock(TypedDict):
 
 
 _easy_ocr = None
+_easy_ocr_lock = threading.Lock()
 _tesseract_available: bool | None = None
-_ocr_cache: dict[str, list[TextBlock]] = {}
+_tesseract_lock = threading.Lock()
+_ocr_cache: OrderedDict[str, list[TextBlock]] = OrderedDict()
+_ocr_cache_lock = threading.Lock()
+_OCR_CACHE_MAX = 100
+
+
+def _cache_put(key: str, value: list[TextBlock]) -> None:
+    with _ocr_cache_lock:
+        _ocr_cache[key] = value
+        _ocr_cache.move_to_end(key)
+        while len(_ocr_cache) > _OCR_CACHE_MAX:
+            _ocr_cache.popitem(last=False)
 
 
 def _check_tesseract() -> bool:
@@ -45,35 +59,41 @@ def _check_tesseract() -> bool:
     if _tesseract_available is not None:
         return _tesseract_available
 
-    custom_path = os.environ.get("TESSERACT_CMD")
-    if custom_path:
-        try:
-            import pytesseract
-            pytesseract.pytesseract.tesseract_cmd = custom_path
-        except ImportError:
-            pass
+    with _tesseract_lock:
+        if _tesseract_available is not None:
+            return _tesseract_available
 
-    _tesseract_available = bool(shutil.which("tesseract") or custom_path)
-    reg = get_registry()
-    if _tesseract_available:
-        reg.update("ocr_tesseract", ModuleState.IDLE, "พร้อมใช้งาน")
-    else:
-        reg.update("ocr_tesseract", ModuleState.NOT_READY,
-                   "ไม่พบ binary — Stage 2 ถูกข้าม")
+        custom_path = os.environ.get("TESSERACT_CMD")
+        if custom_path:
+            try:
+                import pytesseract
+                pytesseract.pytesseract.tesseract_cmd = custom_path
+            except ImportError:
+                pass
+
+        _tesseract_available = bool(shutil.which("tesseract") or custom_path)
+        reg = get_registry()
+        if _tesseract_available:
+            reg.update("ocr_tesseract", ModuleState.IDLE, "พร้อมใช้งาน")
+        else:
+            reg.update("ocr_tesseract", ModuleState.NOT_READY,
+                       "ไม่พบ binary — Stage 2 ถูกข้าม")
     return _tesseract_available
 
 
 def _get_easyocr():
     global _easy_ocr
     if _easy_ocr is None:
-        reg = get_registry()
-        reg.update("ocr_easyocr", ModuleState.LOADING, "กำลังโหลด EasyOCR model...")
-        import easyocr
-        import torch
-        gpu = torch.cuda.is_available()
-        _easy_ocr = easyocr.Reader(["en"], gpu=gpu)
-        reg.update("ocr_easyocr", ModuleState.IDLE,
-                   f"พร้อมใช้งาน (GPU: {gpu})")
+        with _easy_ocr_lock:
+            if _easy_ocr is None:
+                reg = get_registry()
+                reg.update("ocr_easyocr", ModuleState.LOADING, "กำลังโหลด EasyOCR model...")
+                import easyocr
+                import torch
+                gpu = torch.cuda.is_available()
+                _easy_ocr = easyocr.Reader(["en"], gpu=gpu)
+                reg.update("ocr_easyocr", ModuleState.IDLE,
+                           f"พร้อมใช้งาน (GPU: {gpu})")
     return _easy_ocr
 
 
@@ -92,10 +112,11 @@ def _render_page(pdf_bytes: bytes, page_num: int = 0) -> tuple[np.ndarray, float
     w = page.rect.width
     zoom = 1.5 if w < 800 else (1500 / w if w > 1500 else 1.0)
     pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
-    img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+    img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n).copy()
     if pix.n == 4:
         img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
     del pix
+    doc.close()
     gc.collect()
     return img, zoom
 
@@ -125,8 +146,10 @@ def _tesseract_blocks(pdf_bytes: bytes) -> list[TextBlock]:
 def extract_text_blocks(pdf_bytes: bytes, use_ai: bool = True) -> list[TextBlock]:
     """Run OCR fallback chain with real-time status updates."""
     file_hash = hashlib.md5(pdf_bytes).hexdigest()
-    if file_hash in _ocr_cache:
-        return _ocr_cache[file_hash]
+    with _ocr_cache_lock:
+        if file_hash in _ocr_cache:
+            _ocr_cache.move_to_end(file_hash)
+            return _ocr_cache[file_hash]
 
     threshold = settings.OCR_THRESHOLD
     reg = get_registry()
@@ -156,7 +179,7 @@ def extract_text_blocks(pdf_bytes: bytes, use_ai: bool = True) -> list[TextBlock
         reg.update("ocr_pdfminer", ModuleState.ERROR, str(exc))
 
     if not use_ai or len(blocks) >= threshold:
-        _ocr_cache[file_hash] = blocks
+        _cache_put(file_hash, blocks)
         return blocks
 
     # ── Stage 2: Tesseract ─────────────────────────────────────────────────
@@ -176,7 +199,7 @@ def extract_text_blocks(pdf_bytes: bytes, use_ai: bool = True) -> list[TextBlock
             reg.update("ocr_tesseract", ModuleState.ERROR, str(exc))
 
     if len(blocks) >= threshold:
-        _ocr_cache[file_hash] = blocks
+        _cache_put(file_hash, blocks)
         return blocks
 
     # ── Stage 3: EasyOCR ───────────────────────────────────────────────────
@@ -205,5 +228,5 @@ def extract_text_blocks(pdf_bytes: bytes, use_ai: bool = True) -> list[TextBlock
     except Exception as exc:
         reg.update("ocr_easyocr", ModuleState.ERROR, str(exc))
 
-    _ocr_cache[file_hash] = blocks
+    _cache_put(file_hash, blocks)
     return blocks

@@ -12,7 +12,7 @@ async function autoLoadTemplate() {
     status.classList.remove("hidden");
 
     try {
-        const res = await fetch("/api/get-template");
+        const res = await fetchWithAuth("/api/get-template");
         if (!res.ok) throw new Error("not found");
         const blob = await res.blob();
         state.excelFile = new File([blob], "Templates.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
@@ -38,7 +38,15 @@ async function autoLoadTemplate() {
 async function parseExcelHeaders(blobOrFile) {
     const data  = await blobOrFile.arrayBuffer();
     const wb    = XLSX.read(data);
+    if (!wb.SheetNames || !wb.SheetNames.length) {
+        await customAlert("ไฟล์ Excel ไม่ถูกต้อง: ไม่พบ Sheet", "error");
+        return;
+    }
     const sheet = wb.Sheets[wb.SheetNames[0]];
+    if (!sheet || !sheet["!ref"]) {
+        await customAlert("ไฟล์ Excel ไม่ถูกต้อง: Sheet ว่างเปล่า", "error");
+        return;
+    }
     const range = XLSX.utils.decode_range(sheet["!ref"]);
     state.columnHeaders = {};
     for (let C = range.s.c; C <= range.e.c; ++C) {

@@ -28,6 +28,7 @@ from app.dependencies import get_current_user
 from app.services.ocr_pipeline import extract_text_blocks
 from app.services.parser import parse_item_records, _clean
 from app.services.ai_status import get_registry, ModuleState
+from app.config import settings
 import time
 import uuid
 
@@ -35,6 +36,7 @@ router = APIRouter(tags=["Core"])
 
 HISTORY_DIR = "history_db"
 DATASET_DIR = "dataset"
+MAX_UPLOAD_BYTES = settings.MAX_UPLOAD_MB * 1024 * 1024
 
 
 # ── Template download ─────────────────────────────────────────────────────────
@@ -68,6 +70,13 @@ async def extract_ai_image(
         }
 
         ai_content = await file.read()
+
+        # --- File size guard --------------------------------------------------
+        if len(ai_content) > MAX_UPLOAD_BYTES:
+            return JSONResponse(
+                status_code=413,
+                content={"status": "error", "message": f"ไฟล์ใหญ่เกิน {settings.MAX_UPLOAD_MB} MB"},
+            )
 
         # --- OCR via fallback chain -------------------------------------------
         text_blocks = extract_text_blocks(ai_content, use_ai=is_ai_enabled)
@@ -103,6 +112,7 @@ async def extract_ai_image(
         # --- Duplicate guard --------------------------------------------------
         dups = [r["item_id"] for r in records if r["item_id"] in existing]
         if dups:
+            doc.close()
             return JSONResponse(
                 status_code=400,
                 content={
@@ -151,6 +161,9 @@ async def extract_ai_image(
                     "height": bbox[3] - bbox[1],
                 },
             })
+            buf.close()
+
+        doc.close()
 
         return {
             "status": "success",

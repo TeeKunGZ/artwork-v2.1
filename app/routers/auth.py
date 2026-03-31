@@ -61,6 +61,11 @@ async def change_own_password(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if len(new_password) < 8:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร"},
+        )
     user = get_user(db, current_user["emp_id"])
     if not verify_password(old_password, user.password_hash):
         return JSONResponse(

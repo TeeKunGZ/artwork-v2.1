@@ -33,8 +33,13 @@ async def generate_excel(
     reg.update("excel_export", ModuleState.RUNNING, "กำลังสร้างไฟล์ Excel...")
 
     try:
-        records  = json.loads(text_data)
-        mappings = json.loads(mapping_data)
+        try:
+            records  = json.loads(text_data)
+            mappings = json.loads(mapping_data)
+        except json.JSONDecodeError as exc:
+            reg.update("excel_export", ModuleState.ERROR, "Invalid JSON input")
+            return JSONResponse(status_code=400,
+                                content={"status": "error", "message": f"Invalid JSON: {exc}"})
         crops    = [(img.filename, await img.read()) for img in images]
 
         workbook_bytes = generate_excel_bytes(records, crops, mappings)
@@ -69,8 +74,12 @@ async def generate_zip(
     _: dict = Depends(get_current_user),
 ):
     try:
-        records  = json.loads(text_data)
-        mappings = json.loads(mapping_data)
+        try:
+            records  = json.loads(text_data)
+            mappings = json.loads(mapping_data)
+        except json.JSONDecodeError as exc:
+            return JSONResponse(status_code=400,
+                                content={"status": "error", "message": f"Invalid JSON: {exc}"})
         crops    = [(img.filename, await img.read()) for img in images]
 
         zip_bytes = generate_zip_bytes(records, crops, mappings)
@@ -83,67 +92,3 @@ async def generate_zip(
     except Exception as exc:
         return JSONResponse(status_code=400,
                             content={"status": "error", "message": str(exc)})
-
-
-@router.post("/generate-excel")
-async def generate_excel(
-    text_data: str = Form(...),
-    mapping_data: str = Form(...),
-    images: list[UploadFile] = File([]),
-    excel_file: UploadFile = File(None),
-    _: dict = Depends(get_current_user),
-):
-    try:
-        records = json.loads(text_data)
-        mappings = json.loads(mapping_data)
-
-        # Read all image bytes up-front (UploadFile can only be read once)
-        crops = [(img.filename, await img.read()) for img in images]
-
-        workbook_bytes = generate_excel_bytes(records, crops, mappings)
-
-        filename = f"Artwork_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-        return StreamingResponse(
-            io.BytesIO(workbook_bytes),
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
-        )
-
-    except FileNotFoundError as exc:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "error", "message": str(exc)},
-        )
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "message": f"Server Error: {exc}"},
-        )
-
-
-@router.post("/generate-zip")
-async def generate_zip(
-    text_data: str = Form(...),
-    mapping_data: str = Form(...),
-    images: list[UploadFile] = File([]),
-    _: dict = Depends(get_current_user),
-):
-    try:
-        records = json.loads(text_data)
-        mappings = json.loads(mapping_data)
-        crops = [(img.filename, await img.read()) for img in images]
-
-        zip_bytes = generate_zip_bytes(records, crops, mappings)
-
-        return StreamingResponse(
-            io.BytesIO(zip_bytes),
-            media_type="application/zip",
-            headers={"Content-Disposition": "attachment; filename=Artwork_Assets.zip"},
-        )
-    except Exception as exc:
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "message": str(exc)},
-        )

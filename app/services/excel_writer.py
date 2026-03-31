@@ -89,78 +89,80 @@ def generate_excel_bytes(
         raise FileNotFoundError("ไม่พบไฟล์ Templates.xlsx")
 
     wb    = openpyxl.load_workbook(TEMPLATE_PATH)
-    sheet = wb.active
+    try:
+        sheet = wb.active
 
-    row_map  = _build_row_map(sheet)
-    next_row = _next_empty_row(row_map)
+        row_map  = _build_row_map(sheet)
+        next_row = _next_empty_row(row_map)
 
-    # ── Write text columns ───────────────────────────────────────────────────
-    for rec in records:
-        item_id = str(rec.get("item_id", "")).strip()
-        if not item_id:
-            continue
+        # ── Write text columns ───────────────────────────────────────────────────
+        for rec in records:
+            item_id = str(rec.get("item_id", "")).strip()
+            if not item_id:
+                continue
 
-        if item_id in row_map:
+            if item_id in row_map:
+                target_row = row_map[item_id]
+            else:
+                target_row       = next_row
+                row_map[item_id] = target_row
+                next_row        += 1
+
+            sheet.cell(row=target_row, column=_TEXT_COLS["style"],    value=rec.get("style"))
+            sheet.cell(row=target_row, column=_TEXT_COLS["item_id"],  value=item_id)
+            sheet.cell(row=target_row, column=_TEXT_COLS["cw"],       value=rec.get("cw"))
+            sheet.cell(row=target_row, column=_TEXT_COLS["org_code"], value=rec.get("org_code"))
+            sheet.cell(row=target_row, column=_TEXT_COLS["team"],     value=rec.get("team"))
+            sheet.cell(row=target_row, column=_TEXT_COLS["color"],    value=rec.get("color"))
+
+        # ── Embed images ─────────────────────────────────────────────────────────
+        for fname, img_data in crops:
+            if fname not in mappings:
+                continue
+
+            map_info          = mappings[fname]
+            item_id           = str(map_info["item_id"]).strip()
+            target_col_letter = map_info["col"]
+
+            if item_id not in row_map:
+                continue
+
+            if target_col_letter not in _IMAGE_COL_LETTERS:
+                print(f"[ExcelWriter] Skipped col {target_col_letter}: ไม่อยู่ใน image column list")
+                continue
+
             target_row = row_map[item_id]
-        else:
-            target_row       = next_row
-            row_map[item_id] = target_row
-            next_row        += 1
+            col_idx    = column_index_from_string(target_col_letter)  # 1-based
 
-        sheet.cell(row=target_row, column=_TEXT_COLS["style"],    value=rec.get("style"))
-        sheet.cell(row=target_row, column=_TEXT_COLS["item_id"],  value=item_id)
-        sheet.cell(row=target_row, column=_TEXT_COLS["cw"],       value=rec.get("cw"))
-        sheet.cell(row=target_row, column=_TEXT_COLS["org_code"], value=rec.get("org_code"))
-        sheet.cell(row=target_row, column=_TEXT_COLS["team"],     value=rec.get("team"))
-        sheet.cell(row=target_row, column=_TEXT_COLS["color"],    value=rec.get("color"))
+            # TwoCellAnchor: stretch รูปให้เต็ม cell อัตโนมัติ
+            # ไม่ต้องคำนวณ pixel — Excel จัดการ scaling เอง
+            from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor
+            from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
 
-    # ── Embed images ─────────────────────────────────────────────────────────
-    for fname, img_data in crops:
-        if fname not in mappings:
-            continue
+            xl_img = XLImage(io.BytesIO(img_data))  # embed bytes ต้นฉบับ resolution เต็ม
 
-        map_info          = mappings[fname]
-        item_id           = str(map_info["item_id"]).strip()
-        target_col_letter = map_info["col"]
+            anchor        = TwoCellAnchor()
+            anchor.editAs = "oneCell"               # ล็อคมุมบนซ้าย, ขยายตาม cell
 
-        if item_id not in row_map:
-            continue
+            # มุมบนซ้าย = cell นี้
+            anchor._from      = AnchorMarker(
+                col=col_idx - 1, colOff=0,
+                row=target_row - 1, rowOff=0,
+            )
+            # มุมล่างขวา = cell ถัดไป (ขยายเต็ม cell)
+            anchor.to         = AnchorMarker(
+                col=col_idx, colOff=0,
+                row=target_row, rowOff=0,
+            )
+            xl_img.anchor     = anchor
+            sheet.add_image(xl_img)
 
-        if target_col_letter not in _IMAGE_COL_LETTERS:
-            print(f"[ExcelWriter] Skipped col {target_col_letter}: ไม่อยู่ใน image column list")
-            continue
-
-        target_row = row_map[item_id]
-        col_idx    = column_index_from_string(target_col_letter)  # 1-based
-
-        # TwoCellAnchor: stretch รูปให้เต็ม cell อัตโนมัติ
-        # ไม่ต้องคำนวณ pixel — Excel จัดการ scaling เอง
-        from openpyxl.drawing.spreadsheet_drawing import TwoCellAnchor
-        from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
-
-        xl_img = XLImage(io.BytesIO(img_data))  # embed bytes ต้นฉบับ resolution เต็ม
-
-        anchor        = TwoCellAnchor()
-        anchor.editAs = "oneCell"               # ล็อคมุมบนซ้าย, ขยายตาม cell
-
-        # มุมบนซ้าย = cell นี้
-        anchor._from      = AnchorMarker(
-            col=col_idx - 1, colOff=0,
-            row=target_row - 1, rowOff=0,
-        )
-        # มุมล่างขวา = cell ถัดไป (ขยายเต็ม cell)
-        anchor.to         = AnchorMarker(
-            col=col_idx, colOff=0,
-            row=target_row, rowOff=0,
-        )
-        xl_img.anchor     = anchor
-        sheet.add_image(xl_img)
-
-    out = io.BytesIO()
-    wb.save(out)
-    wb.close()
-    out.seek(0)
-    return out.getvalue()
+        out = io.BytesIO()
+        wb.save(out)
+        out.seek(0)
+        return out.getvalue()
+    finally:
+        wb.close()
 
 
 def generate_zip_bytes(

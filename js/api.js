@@ -3,6 +3,11 @@
 // =============================================================================
 const API_BASE = "/api";
 
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function closeCustomDialog() {
     document.getElementById('customDialogOverlay').classList.add('hidden');
     document.getElementById('customAlertBox').classList.add('hidden');
@@ -252,14 +257,15 @@ async function loadAdminTeams() {
         ddEdit.innerHTML = `<option value="">-- เลือกทีม --</option>`;
         
         teams.forEach(t => {
+            const safeName = escapeHtml(t.name);
             list.insertAdjacentHTML('beforeend', `
                 <div class="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
-                    <span class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-hashtag text-indigo-300 mr-2"></i>${t.name}</span>
-                    <button onclick="deleteTeam(${t.id}, '${t.name}')" class="text-slate-300 hover:text-red-500 p-1 transition" title="ลบชื่อทีมนี้"><i class="fa-solid fa-trash"></i></button>
+                    <span class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-hashtag text-indigo-300 mr-2"></i>${safeName}</span>
+                    <button onclick="deleteTeam(${Number(t.id)}, '${safeName}')" class="text-slate-300 hover:text-red-500 p-1 transition" title="ลบชื่อทีมนี้"><i class="fa-solid fa-trash"></i></button>
                 </div>
             `);
-            ddAdd.insertAdjacentHTML('beforeend', `<option value="${t.name}">${t.name}</option>`);
-            ddEdit.insertAdjacentHTML('beforeend', `<option value="${t.name}">${t.name}</option>`);
+            ddAdd.insertAdjacentHTML('beforeend', `<option value="${safeName}">${safeName}</option>`);
+            ddEdit.insertAdjacentHTML('beforeend', `<option value="${safeName}">${safeName}</option>`);
         });
         if(teams.length === 0) list.innerHTML = `<p class="col-span-2 text-center text-slate-400 text-xs py-4">ยังไม่มีชื่อทีมในระบบ</p>`;
     } catch (e) { list.innerHTML = `<p class="col-span-2 text-center text-red-500 text-xs py-4">ดึงข้อมูลทีมล้มเหลว</p>`; }
@@ -332,12 +338,18 @@ async function loadAdminUsers() {
                 
             const lastLogin = u.last_login ? new Date(u.last_login).toLocaleString('th-TH') : '-';
             
+            const safeEmpId = escapeHtml(u.emp_id);
+            const safeFirst = escapeHtml(u.first_name);
+            const safeLast  = escapeHtml(u.last_name || '');
+            const safeTeam  = escapeHtml(u.team_name);
+            const userDataAttr = escapeHtml(JSON.stringify(u));
+
             list.insertAdjacentHTML('beforeend', `
                 <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
-                    <td class="p-3 font-bold text-slate-700">${u.emp_id}</td>
+                    <td class="p-3 font-bold text-slate-700">${safeEmpId}</td>
                     <td class="p-3">
-                        <p class="font-bold text-slate-800 text-sm">${u.first_name} ${u.last_name || ''}</p>
-                        <p class="text-[10px] text-slate-500 mt-0.5"><i class="fa-solid fa-users text-slate-300 mr-1"></i> ทีม: ${u.team_name}</p>
+                        <p class="font-bold text-slate-800 text-sm">${safeFirst} ${safeLast}</p>
+                        <p class="text-[10px] text-slate-500 mt-0.5"><i class="fa-solid fa-users text-slate-300 mr-1"></i> ทีม: ${safeTeam}</p>
                         <p class="text-[10px] text-slate-400"><i class="fa-regular fa-clock mr-1"></i> ล่าสุด: ${lastLogin}</p>
                     </td>
                     <td class="p-3">
@@ -348,9 +360,9 @@ async function loadAdminUsers() {
                     </td>
                     <td class="p-3 text-center">
                         <div class="flex justify-center gap-2">
-                            <button onclick='openEditUserModal(${JSON.stringify(u)})' class="w-8 h-8 flex items-center justify-center text-indigo-500 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 rounded transition shadow-sm bg-white" title="แก้ไขข้อมูลพนักงาน"><i class="fa-solid fa-pen-to-square"></i></button>
-                            <button onclick="resetUserPassword('${u.emp_id}')" class="w-8 h-8 flex items-center justify-center text-amber-500 hover:bg-amber-50 border border-transparent hover:border-amber-200 rounded transition shadow-sm bg-white" title="รีเซ็ตรหัสผ่าน"><i class="fa-solid fa-key"></i></button>
-                            <button onclick="deleteUser('${u.emp_id}')" class="w-8 h-8 flex items-center justify-center text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 rounded transition shadow-sm bg-white" title="ลบบัญชีถาวร"><i class="fa-solid fa-trash"></i></button>
+                            <button data-user="${userDataAttr}" onclick="openEditUserModal(JSON.parse(this.dataset.user))" class="w-8 h-8 flex items-center justify-center text-indigo-500 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 rounded transition shadow-sm bg-white" title="แก้ไขข้อมูลพนักงาน"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="resetUserPassword('${safeEmpId}')" class="w-8 h-8 flex items-center justify-center text-amber-500 hover:bg-amber-50 border border-transparent hover:border-amber-200 rounded transition shadow-sm bg-white" title="รีเซ็ตรหัสผ่าน"><i class="fa-solid fa-key"></i></button>
+                            <button onclick="deleteUser('${safeEmpId}')" class="w-8 h-8 flex items-center justify-center text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 rounded transition shadow-sm bg-white" title="ลบบัญชีถาวร"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </td>
                 </tr>

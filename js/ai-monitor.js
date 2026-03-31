@@ -33,7 +33,7 @@ const AI_MONITOR = (() => {
                 const data = JSON.parse(e.data);
                 if (data.type === "ping") return;
                 if (data.type === "snapshot") { _lastData = data; _render(data.modules); }
-            } catch (_) {}
+            } catch (err) { console.warn("[AI Monitor] JSON parse failed:", err); }
         };
         _es.onerror = () => {
             _connected = false;

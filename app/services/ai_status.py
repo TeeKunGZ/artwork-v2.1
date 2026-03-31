@@ -152,7 +152,7 @@ class AIStatusRegistry:
     def _broadcast(self) -> None:
         snapshot = self.get_snapshot()
         dead = []
-        for q in self._listeners:
+        for q in list(self._listeners):
             try:
                 q.put_nowait(snapshot)
             except asyncio.QueueFull:

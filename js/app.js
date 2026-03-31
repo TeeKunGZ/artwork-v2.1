@@ -117,7 +117,9 @@ document.getElementById("btnAddCrop").addEventListener("click", async () => {
     localStorage.setItem(COL_MEMORY_KEY, JSON.stringify(memory)); 
     state.sessionCropMemory[col] = cropData;
 
-    state.cropper.getCroppedCanvas().toBlob((blob) => {
+    const croppedCanvas = state.cropper.getCroppedCanvas();
+    if (!croppedCanvas) return await customAlert("พื้นที่ตัดเล็กเกินไป กรุณาลากใหม่", "warning");
+    croppedCanvas.toBlob((blob) => {
         selectedRecBtns.forEach(recBtn => {
             const itemId = recBtn.dataset.itemid; 
             const styleCode = getStyleFromItemId(itemId); 

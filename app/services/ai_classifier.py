@@ -9,6 +9,7 @@ import gc
 import io
 import json
 import os
+import threading
 import time
 
 import numpy as np
@@ -47,7 +48,7 @@ class FeatureExtractor:
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else
-            "mps" if torch.backends.mps.is_available() else
+            "mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else
             "cpu"
         )
         self.model.to(self.device)
@@ -182,7 +183,11 @@ class FeatureExtractor:
 
         scores, indices = self._index.search(vec.reshape(1, -1), k=1)
         best_score = float(scores[0][0])
-        best_label = self._labels[int(indices[0][0])]
+        best_idx = int(indices[0][0])
+        if best_idx < 0 or best_idx >= len(self._labels):
+            reg.update("ai_predict", ModuleState.ERROR, "FAISS returned invalid index")
+            return {"status": "error", "message": "FAISS returned invalid index"}
+        best_label = self._labels[best_idx]
         elapsed = int((time.time() - start) * 1000)
 
         if best_score < threshold:
@@ -199,12 +204,15 @@ class FeatureExtractor:
 
 # ── Lazy singleton ────────────────────────────────────────────────────────────
 _instance: FeatureExtractor | None = None
+_instance_lock = threading.Lock()
 
 
 def get_ai_classifier() -> FeatureExtractor:
     global _instance
     if _instance is None:
-        print("[AI] Loading ResNet18...")
-        _instance = FeatureExtractor()
-        print("[AI] ResNet18 + FAISS ready")
+        with _instance_lock:
+            if _instance is None:
+                print("[AI] Loading ResNet18...")
+                _instance = FeatureExtractor()
+                print("[AI] ResNet18 + FAISS ready")
     return _instance
