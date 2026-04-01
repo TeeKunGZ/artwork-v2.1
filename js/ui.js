@@ -431,3 +431,13 @@ window.deleteAutoCrop = (filename) => {
     renderAvailableColumns(); 
     renderTextDataCards(); 
 };
+
+window.copyColorToClipboard = (text, btn) => {
+    navigator.clipboard.writeText(text).then(() => {
+        const icon = btn.querySelector("i");
+        if (icon) {
+            icon.className = "fa-solid fa-check text-emerald-500";
+            setTimeout(() => { icon.className = "fa-regular fa-copy"; }, 2000);
+        }
+    }).catch(err => console.error("Failed to copy:", err));
+};

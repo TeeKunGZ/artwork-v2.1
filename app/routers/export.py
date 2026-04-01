@@ -5,6 +5,7 @@ Export routes:
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import time
@@ -40,9 +41,14 @@ async def generate_excel(
             reg.update("excel_export", ModuleState.ERROR, "Invalid JSON input")
             return JSONResponse(status_code=400,
                                 content={"status": "error", "message": f"Invalid JSON: {exc}"})
-        crops    = [(img.filename, await img.read()) for img in images]
+        # Read all uploaded images in parallel
+        async def _read_img(img: UploadFile):
+            return (img.filename, await img.read())
+        crops = await asyncio.gather(*[_read_img(img) for img in images])
 
-        workbook_bytes = generate_excel_bytes(records, crops, mappings)
+        workbook_bytes = await asyncio.to_thread(
+            generate_excel_bytes, records, list(crops), mappings
+        )
 
         elapsed = int((time.time() - start) * 1000)
         reg.update("excel_export", ModuleState.IDLE,
@@ -80,9 +86,13 @@ async def generate_zip(
         except json.JSONDecodeError as exc:
             return JSONResponse(status_code=400,
                                 content={"status": "error", "message": f"Invalid JSON: {exc}"})
-        crops    = [(img.filename, await img.read()) for img in images]
+        async def _read_img(img: UploadFile):
+            return (img.filename, await img.read())
+        crops = await asyncio.gather(*[_read_img(img) for img in images])
 
-        zip_bytes = generate_zip_bytes(records, crops, mappings)
+        zip_bytes = await asyncio.to_thread(
+            generate_zip_bytes, records, list(crops), mappings
+        )
 
         return StreamingResponse(
             io.BytesIO(zip_bytes),
