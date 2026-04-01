@@ -38,6 +38,7 @@ app = FastAPI(
 
 # ── Static files ──────────────────────────────────────────────────────────────
 app.mount("/js", StaticFiles(directory="js"), name="js")
+app.mount("/css", StaticFiles(directory="css"), name="css")
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 # Auth  — /api/login, /api/me, /api/users/me/password

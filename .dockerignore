@@ -8,6 +8,11 @@ __pycache__/
 *.pyc
 .vscode/
 .idea/
+node_modules/
+package.json
+package-lock.json
+tailwind.config.js
+css/input.css
 
 # ข้อมูลที่ควรให้ Volume จัดการแทน
 dataset/

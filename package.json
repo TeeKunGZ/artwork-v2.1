@@ -1,0 +1,26 @@
+{
+  "name": "artportal_v2.1",
+  "version": "1.0.0",
+  "description": "<div align=\"center\">",
+  "main": "index.js",
+  "scripts": {
+    "build:css": "tailwindcss -i ./css/input.css -o ./css/output.css --minify",
+    "watch:css": "tailwindcss -i ./css/input.css -o ./css/output.css --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tee-AI888/artwork-v2.1.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Tee-AI888/artwork-v2.1/issues"
+  },
+  "homepage": "https://github.com/Tee-AI888/artwork-v2.1#readme",
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}

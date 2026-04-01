@@ -32,3 +32,6 @@ faiss_labels.json
 .idea/
 .DS_Store
 Thumbs.db
+
+# Node.js (Tailwind CSS build)
+node_modules/
