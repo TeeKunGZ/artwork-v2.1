@@ -121,9 +121,14 @@ function renderTextDataCards() {
         const card = document.createElement("div"); 
         card.className = `relative rounded-xl p-4 flex flex-col gap-3 min-w-[240px] shadow-sm transition-all ${border}`;
         
+        const manualBadge = rec.manual ? `<span class="absolute -top-3 -left-2 bg-indigo-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md"><i class="fa-solid fa-pen-to-square mr-1"></i>เพิ่มเอง</span>` : "";
+        const deleteBtn = `<button type="button" onclick="deleteManualRecord(${idx})" class="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-md bg-white/80 border border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-200 transition shadow-sm z-10" title="ลบ Record นี้ออกจากรายการ"><i class="fa-solid fa-trash text-[10px]"></i></button>`;
+
         card.innerHTML = `
             ${readyBadge}
-            <div class="border-b ${isReady ? "border-emerald-200" : "border-slate-200"} pb-2 mb-1">
+            ${manualBadge}
+            ${deleteBtn}
+            <div class="border-b ${isReady ? "border-emerald-200" : "border-slate-200"} pb-2 mb-1 pr-7">
                 <p class="text-xs ${isReady ? "text-emerald-600" : "text-slate-500"} uppercase tracking-wider font-bold">Item ID</p>
                 <p class="font-black ${isReady ? "text-emerald-800" : "text-indigo-700"} text-lg truncate w-full" title="${rec.item_id}">${rec.item_id || "-"}</p>
             </div>
@@ -246,51 +251,72 @@ function renderAvailableRecords() {
 }
 
 function renderAvailableColumns() {
-    const group = document.getElementById("columnButtonGroup"); 
+    const group = document.getElementById("columnButtonGroup");
     const prevCol = document.querySelector(".col-card.selected")?.dataset.col;
-    const selectedItemIds = Array.from(document.querySelectorAll(".rec-card.selected")).map(b => b.dataset.itemid); 
+    const selectedItemIds = Array.from(document.querySelectorAll(".rec-card.selected")).map(b => b.dataset.itemid);
     group.innerHTML = "";
-    
-    IMAGE_COLUMNS.forEach((col, idx) => {
-        const btn = document.createElement("div"); 
-        const used = selectedItemIds.length > 0 && selectedItemIds.some(id => isMapped(id, col)); 
-        const header = state.columnHeaders[col] || `Col ${col}`;
-        
-        if (used) { 
-            btn.className = "col-card border border-slate-200 bg-slate-100 rounded-lg p-2 flex flex-col items-center justify-center text-center opacity-50 cursor-not-allowed"; 
-            btn.innerHTML = `<span class="font-black text-slate-400 text-lg mb-0.5">${col}</span><span class="text-slate-500 text-[9px] font-bold leading-tight">✅ ใช้งานแล้ว</span>`; 
-            btn.onclick = async () => await customAlert(`คอลัมน์ ${col} ถูกใช้งานไปแล้วสำหรับสีที่เลือกครับ`, "warning"); 
-        } 
-        else {
-            btn.className = "col-card border border-slate-200 bg-white rounded-lg p-2 flex flex-col items-center justify-center text-center relative"; 
-            if (col === prevCol) btn.classList.add("selected");
-            btn.dataset.col = col; 
-            btn.dataset.colname = header;
-            btn.innerHTML = `${idx < 9 ? `<span class="absolute top-1 left-1 text-[8px] font-black text-slate-300">${idx + 1}</span>` : ''}<span class="font-black text-indigo-700 text-lg mb-0.5">${col}</span><span class="text-slate-500 text-[9px] font-medium leading-tight line-clamp-2 px-1" title="${header}">${header}</span>`;
-            
-            btn.onclick = () => {
-                document.querySelectorAll(".col-card").forEach(b => b.classList.remove("selected")); 
-                btn.classList.add("selected");
-                if (state.cropper && selectedItemIds.length > 0) {
-                    const primaryItemId = selectedItemIds[0]; 
-                    const styleCode = getStyleFromItemId(primaryItemId); 
-                    
-                    if (state.globalCropMemory[styleCode] && state.globalCropMemory[styleCode][col]) { 
-                        state.cropper.setData(state.globalCropMemory[styleCode][col]); 
-                        showSnapAlert(`โหลดตำแหน่งเดิมของสไตล์ ${styleCode} (Col ${col})`, 'item'); 
-                    } 
-                    else if (state.globalCropMemory[primaryItemId] && state.globalCropMemory[primaryItemId][col]) { 
-                        state.cropper.setData(state.globalCropMemory[primaryItemId][col]); 
-                        showSnapAlert(`โหลดตำแหน่งเดิมของ ${primaryItemId} (Col ${col})`, 'item'); 
-                    } 
-                    else if (state.sessionCropMemory[col]) { 
-                        state.cropper.setData(state.sessionCropMemory[col]); 
-                        showSnapAlert(`โหลดตำแหน่งล่าสุดของ Col ${col}`, 'session'); 
+
+    let kbdIdx = 0; // running 1-based number for keyboard shortcuts
+
+    COLUMN_GROUPS.forEach(grp => {
+        const theme = grp.theme || "slate";
+        const groupEl = document.createElement("div");
+        groupEl.className = `col-group-${theme}`;
+
+        const labelEl = document.createElement("div");
+        labelEl.className = "col-group-label truncate";
+        labelEl.textContent = grp.label;
+        labelEl.title = grp.label;
+        groupEl.appendChild(labelEl);
+
+        grp.cols.forEach(({ col, short }) => {
+            const used = selectedItemIds.length > 0 && selectedItemIds.some(id => isMapped(id, col));
+            const fullHeader = state.columnHeaders[col] || short;
+            const myKbd = ++kbdIdx;
+
+            const btn = document.createElement("div");
+            btn.dataset.col = col;
+            btn.dataset.colname = fullHeader;
+            btn.title = `${fullHeader} (Col ${col})`;
+
+            const baseClasses = `col-card col-card-base col-card-${theme}`;
+
+            if (used) {
+                btn.className = `${baseClasses} col-card-used`;
+                btn.innerHTML = `<span class="col-short">${short}</span><span class="col-used">✅ ใช้แล้ว</span>`;
+                btn.onclick = async () => await customAlert(`คอลัมน์ "${short}" ถูกใช้งานสำหรับสีที่เลือกแล้วครับ`, "warning");
+            } else {
+                btn.className = baseClasses;
+                if (col === prevCol) btn.classList.add("selected");
+
+                const kbdBadge = myKbd <= 9 ? `<span class="col-kbd">${myKbd}</span>` : "";
+                btn.innerHTML = `${kbdBadge}<span class="col-short">${short}</span>`;
+
+                btn.onclick = () => {
+                    document.querySelectorAll(".col-card").forEach(b => b.classList.remove("selected"));
+                    btn.classList.add("selected");
+                    if (state.cropper && selectedItemIds.length > 0) {
+                        const primaryItemId = selectedItemIds[0];
+                        const styleCode = getStyleFromItemId(primaryItemId);
+
+                        if (state.globalCropMemory[styleCode] && state.globalCropMemory[styleCode][col]) {
+                            state.cropper.setData(state.globalCropMemory[styleCode][col]);
+                            showSnapAlert(`โหลดตำแหน่งเดิมของสไตล์ ${styleCode} (${short})`, 'item');
+                        }
+                        else if (state.globalCropMemory[primaryItemId] && state.globalCropMemory[primaryItemId][col]) {
+                            state.cropper.setData(state.globalCropMemory[primaryItemId][col]);
+                            showSnapAlert(`โหลดตำแหน่งเดิมของ ${primaryItemId} (${short})`, 'item');
+                        }
+                        else if (state.sessionCropMemory[col]) {
+                            state.cropper.setData(state.sessionCropMemory[col]);
+                            showSnapAlert(`โหลดตำแหน่งล่าสุดของ ${short}`, 'session');
+                        }
                     }
-                }
-            };
-        }
-        group.appendChild(btn);
+                };
+            }
+            groupEl.appendChild(btn);
+        });
+        group.appendChild(groupEl);
     });
 }
 
@@ -305,14 +331,15 @@ function renderMappedItems() {
     }
     
     crops.forEach(crop => {
-        const item = document.createElement("div"); 
+        const item = document.createElement("div");
         item.className = "flex items-center gap-2 bg-white border border-slate-200 p-1.5 rounded shadow-sm group";
+        const shortLabel = getColumnShortLabel(crop.col) || `Col ${crop.col}`;
         item.innerHTML = `
             <div class="w-8 h-8 bg-slate-100 rounded overflow-hidden flex-shrink-0 border border-slate-200 flex items-center justify-center">
                 <img src="${crop.previewUrl}" class="max-w-full max-h-full">
             </div>
             <div class="flex-1 min-w-0">
-                <p class="text-[10px] font-bold text-indigo-600 truncate">Col ${crop.col} <span class="text-amber-600">(${crop.colorDesc})</span></p>
+                <p class="text-[10px] font-bold text-indigo-600 truncate" title="${crop.colName || ''}">${shortLabel} <span class="text-amber-600">(${crop.colorDesc})</span></p>
             </div>
             <button class="text-slate-300 hover:text-indigo-600 transition px-1 opacity-50 group-hover:opacity-100" onclick="editCrop('${crop.filename}')" title="แก้ไขกรอบรูปนี้ (Edit)">
                 <i class="fa-solid fa-pen-to-square text-xs"></i>
@@ -441,3 +468,170 @@ window.copyColorToClipboard = (text, btn) => {
         }
     }).catch(err => console.error("Failed to copy:", err));
 };
+
+// =============================================================================
+// Manual Record Entry — สำหรับกรณีระบบอ่านข้อมูลผิดพลาดหรือไม่ครบ
+// =============================================================================
+const ITEM_ID_REGEX = /^[A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+$/;
+
+function _mrFields() {
+    return {
+        itemId: document.getElementById("mrItemId"),
+        style:  document.getElementById("mrStyle"),
+        cw:     document.getElementById("mrCw"),
+        org:    document.getElementById("mrOrgCode"),
+        team:   document.getElementById("mrTeam"),
+        color:  document.getElementById("mrColor"),
+        fabric: document.getElementById("mrFabric"),
+        error:  document.getElementById("mrError"),
+    };
+}
+
+function _mrUpdateAutoFields() {
+    const f = _mrFields();
+    const parts = (f.itemId.value || "").trim().toUpperCase().split("-");
+    f.style.value = parts.length >= 4 ? `${parts[0]}-${parts[3]}` : "";
+    f.cw.value    = parts.length >= 4 ? parts[1] : "";
+    f.org.value   = parts.length >= 4 ? parts[2] : "";
+}
+
+function _mrSetError(msg) {
+    const el = _mrFields().error;
+    if (msg) { el.textContent = msg; el.classList.remove("hidden"); }
+    else { el.textContent = ""; el.classList.add("hidden"); }
+}
+
+window.openManualRecordModal = () => {
+    const f = _mrFields();
+    f.itemId.value = "";
+    f.style.value  = "";
+    f.cw.value     = "";
+    f.org.value    = "";
+    // Pre-fill team/color จากข้อมูลที่อ่านได้ก่อนหน้า เพื่อความสะดวก
+    const firstRec = state.currentTextData[0] || {};
+    f.team.value   = firstRec.team || "";
+    const firstColor = Object.values(state.currentColors || {})[0] || firstRec.color || "";
+    f.color.value  = firstColor;
+    f.fabric.value = firstRec.fabric || "";
+    _mrSetError("");
+
+    // ใช้ <dialog>.showModal() เพื่อ render บน browser top-layer
+    // → อยู่หน้าทุก element โดยไม่ขึ้นกับ z-index/stacking context
+    const dlg = document.getElementById("manualRecordModal");
+    if (dlg.open) dlg.close();
+    if (typeof dlg.showModal === "function") {
+        dlg.showModal();
+    } else {
+        // Fallback สำหรับ browser เก่า (ไม่ควรเจอ Chrome/Edge/Firefox/Safari ใหม่ๆ)
+        dlg.setAttribute("open", "");
+    }
+    setTimeout(() => f.itemId.focus(), 50);
+};
+
+window.closeManualRecordModal = () => {
+    const dlg = document.getElementById("manualRecordModal");
+    if (typeof dlg.close === "function" && dlg.open) {
+        dlg.close();
+    } else {
+        dlg.removeAttribute("open");
+    }
+};
+
+window.saveManualRecord = async () => {
+    const f = _mrFields();
+    const itemId = (f.itemId.value || "").trim().toUpperCase();
+
+    if (!itemId) { _mrSetError("กรุณากรอก ITEM ID"); f.itemId.focus(); return; }
+    if (!ITEM_ID_REGEX.test(itemId)) {
+        _mrSetError("รูปแบบ ITEM ID ไม่ถูกต้อง — ต้องมี 4 ส่วนคั่นด้วย '-' (ตัวอักษร/ตัวเลข)");
+        f.itemId.focus();
+        return;
+    }
+    if (state.currentTextData.some(r => r.item_id === itemId)) {
+        _mrSetError(`มี ITEM ID "${itemId}" อยู่ในรายการแล้ว`);
+        return;
+    }
+    const batchIds = (state.batchTextData || []).map(r => r.item_id);
+    if (batchIds.includes(itemId)) {
+        _mrSetError(`ITEM ID "${itemId}" ซ้ำกับไฟล์ที่บันทึกไว้ก่อนหน้า`);
+        return;
+    }
+
+    const parts = itemId.split("-");
+    const rec = {
+        item_id:  itemId,
+        style:    `${parts[0]}-${parts[3]}`,
+        cw:       parts[1],
+        org_code: parts[2],
+        team:     (f.team.value   || "").trim(),
+        color:    (f.color.value  || "").trim(),
+        fabric:   (f.fabric.value || "").trim(),
+        source_file: state.currentFileName || "manual",
+        manual:   true,
+    };
+
+    state.currentTextData.push(rec);
+    closeManualRecordModal();
+    renderTextDataCards();
+    if (typeof renderAvailableRecords === "function"
+        && document.getElementById("cropModal")
+        && !document.getElementById("cropModal").classList.contains("hidden")) {
+        renderAvailableRecords();
+    }
+    await customAlert(`เพิ่ม ITEM ID "${itemId}" สำเร็จ`, "success");
+};
+
+window.deleteManualRecord = async (idx) => {
+    const rec = state.currentTextData[idx];
+    if (!rec) return;
+
+    const hasMappedCrops = state.currentMappedCrops.some(c => c.itemId === rec.item_id)
+                        || state.batchMappedCrops.some(c => c.itemId === rec.item_id);
+    const warn = hasMappedCrops
+        ? `\n⚠️ Record นี้มีรูปที่หั่นไว้แล้ว ${state.currentMappedCrops.filter(c => c.itemId === rec.item_id).length + state.batchMappedCrops.filter(c => c.itemId === rec.item_id).length} ชิ้น — รูปจะถูกลบทิ้งด้วย`
+        : "";
+
+    if (!(await customConfirm(`ต้องการลบ Record "${rec.item_id}" ใช่ไหม?${warn}`, "ยืนยันการลบ", "warning"))) return;
+
+    state.currentTextData.splice(idx, 1);
+    state.currentMappedCrops = state.currentMappedCrops.filter(c => c.itemId !== rec.item_id);
+    state.batchMappedCrops   = state.batchMappedCrops.filter(c => c.itemId !== rec.item_id);
+
+    renderTextDataCards();
+    if (typeof renderAvailableRecords === "function") renderAvailableRecords();
+    if (typeof renderArtboardGallery === "function") renderArtboardGallery();
+    if (typeof renderAutoMappedUI === "function") renderAutoMappedUI();
+};
+
+(function _wireManualRecordModal() {
+    const itemIdInput = document.getElementById("mrItemId");
+    if (itemIdInput) {
+        itemIdInput.addEventListener("input", () => {
+            itemIdInput.value = itemIdInput.value.toUpperCase();
+            _mrUpdateAutoFields();
+            _mrSetError("");
+        });
+    }
+    const modal = document.getElementById("manualRecordModal");
+    if (!modal) return;
+
+    // คลิกบน backdrop → ปิด modal
+    // (เช็คจากพิกัดคลิกว่าอยู่นอกกล่อง dialog หรือเปล่า — backdrop ไม่ใช่ DOM element แยก)
+    modal.addEventListener("click", (e) => {
+        if (e.target !== modal) return;
+        const rect = modal.getBoundingClientRect();
+        const inside = rect.top <= e.clientY && e.clientY <= rect.bottom
+                    && rect.left <= e.clientX && e.clientX <= rect.right;
+        if (!inside) closeManualRecordModal();
+    });
+
+    // Enter ใน input → submit
+    // (Escape browser handle ให้ native ผ่าน <dialog> cancel event โดยอัตโนมัติ)
+    modal.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && document.activeElement
+                && document.activeElement.tagName === "INPUT") {
+            e.preventDefault();
+            saveManualRecord();
+        }
+    });
+})();

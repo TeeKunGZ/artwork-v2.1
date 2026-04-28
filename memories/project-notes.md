@@ -36,10 +36,14 @@
 - Database: SQLite / PostgreSQL
 
 **Key Features:**
-- OCR Pipeline for .ai files
+- OCR Pipeline for .ai files (PDFMiner → Tesseract → EasyOCR)
+- ITEM ID parser (XXXX-XXX-XXX-XXX → Style/CW/ORG_CODE auto-split)
+- Manual record entry (กรอกเอง กรณี OCR อ่านผิด/ไม่ครบ) + per-record delete
 - Crop Tool with Auto Crop (GrabCut)
 - AI Classifier (ResNet18 + FAISS)
-- Excel Export with embedded images
+- Auto-mapping จากประวัติ (history_db/) — ถ้า ITEM ID เดิมเคยทำ จะดึงรูปเก่ามาใช้ซ้ำ
+- Column grouping UI (Garment / Print / Direct EMB / Patch+EMB around / Fabric applique / Heat logo)
+- Excel Export with embedded images (18 image columns: N, R/T/V/X, Z/AB/AD/AF, AH/AJ/AL/AN, AP/AS, AV/AX/AZ)
 - ZIP Export
 - Multi-user with JWT Auth
 

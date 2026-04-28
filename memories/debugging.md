@@ -4,6 +4,31 @@
 
 > See: [project-notes.md](project-notes.md) for workflow requirement
 
+## Domain-Specific Pitfalls
+
+### ⚠️ ITEM ID Deduplication — ห้ามใช้ `fuzz.ratio` กับ ID ที่ share suffix
+**Module:** `app/services/parser.py` → `parse_item_records()`
+
+ITEM ID format: `XXXX-XXX-XXX-XXX` (4 segments). หลาย ID ใน .ai เดียวกันมัก share segments หลังเหมือนกัน เช่น:
+- `03C3-2GY-SDN-4EB`
+- `03AZ-2GY-SDN-4EB`
+- `0TAZ-2GY-SDN-4EB`
+
+**ห้าม** ใช้ `thefuzz.fuzz.ratio()` ทำ dedup — `SequenceMatcher` ให้ ratio ~87% กับ ID ที่ต่างแค่ 2 ตัวแต่ suffix เหมือน 12 ตัว → false positive ตัด ID ที่ต่างกันทิ้ง
+
+**ใช้** exact OCR-normalized equality เท่านั้น:
+```python
+_OCR_CONFUSION = str.maketrans({"O": "0", "I": "1", "L": "1"})
+def _norm(s): return s.upper().translate(_OCR_CONFUSION)
+# dedup: if _norm(rid) in seen_norm: skip
+```
+
+ITEM ID เป็น precise code — ต่างแค่ 1 ตัว = คนละชิ้นจริงๆ อย่าใช้ similarity threshold
+
+**อย่าขยาย OCR confusion map** ไปถึง S↔5, B↔8, G↔6, Z↔2 โดยไม่จำเป็น — ตัวอักษรเหล่านี้เป็น character ของ ID จริง การ normalize อาจตัด ID ที่ legit ออก (เช่น `XYZ` กับ `XY2` จะถูก dedup ผิด)
+
+---
+
 ## Python Issues
 
 ### 1. Import Errors

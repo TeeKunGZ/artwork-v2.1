@@ -212,19 +212,24 @@ def parse_item_records(
         all_colors = {f"Color {i + 1}": c for i, c in enumerate(xmp_colors)}
     default_color = st_color or next(iter(all_colors.values()), "")
 
-    # Deduplicate IDs tolerating OCR character confusion (O↔0, I↔1, L↔1)
+    # Deduplicate IDs only on exact OCR-normalized equality.
+    # Item IDs are precise codes — even one differing character means a different
+    # garment, so DO NOT fall back to fuzz.ratio (false positives across IDs that
+    # share a long common suffix, e.g. `03C3-2GY-SDN-4EB` vs `03AZ-2GY-SDN-4EB`).
+    _OCR_CONFUSION = str.maketrans({"O": "0", "I": "1", "L": "1"})
+
+    def _norm(s: str) -> str:
+        return s.upper().translate(_OCR_CONFUSION)
+
     raw_ids = list(dict.fromkeys(ITEM_ID_PATTERN.findall(raw_text)))
     ids: list[str] = []
+    seen_norm: set[str] = set()
     for rid in raw_ids:
-        is_dup = False
-        for existing in ids:
-            norm_rid = rid.replace("O", "0").replace("I", "1").replace("L", "1")
-            norm_exist = existing.replace("O", "0").replace("I", "1").replace("L", "1")
-            if norm_rid == norm_exist or fuzz.ratio(rid, existing) >= 85:
-                is_dup = True
-                break
-        if not is_dup:
-            ids.append(rid)
+        n = _norm(rid)
+        if n in seen_norm:
+            continue
+        seen_norm.add(n)
+        ids.append(rid)
 
     if not ids:
         return [], global_team, all_colors

@@ -16,8 +16,63 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         .col-card { transition: all 0.2s; cursor: pointer; }
-        .col-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-color: #818cf8; }
-        .col-card.selected { background-color: #eef2ff; border-color: #4f46e5; box-shadow: 0 0 0 2px #c7d2fe; transform: translateY(-2px); }
+        .col-card:hover:not(.col-card-used) { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        /* selected: คง theme bg ของกลุ่ม + เพิ่ม ring เข้ม + scale up เล็กน้อย */
+        .col-card.selected {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 0 0 2px #4f46e5, 0 4px 8px -2px rgba(79, 70, 229, 0.4);
+            outline: none;
+        }
+
+        /* Column group container — bypass Tailwind (no npm/node available to rebuild) */
+        #columnButtonGroup {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.5rem;
+            align-items: start;
+            overflow-y: auto;
+            max-height: 18rem;
+            padding-right: 0.25rem;
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+        }
+        @media (min-width: 1024px) {
+            #columnButtonGroup { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+        }
+        #columnButtonGroup > * { display: flex; flex-direction: column; gap: 0.375rem; align-self: start; }
+
+        /* Column group themes — self-contained CSS แทน Tailwind utilities (เพราะไม่ได้ rebuild) */
+        .col-group-label { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 0.25rem; border-bottom: 1px solid #e2e8f0; }
+        .col-card-base { display: block; border: 1px solid; border-radius: 0.375rem; padding: 0.375rem 0.5rem; text-align: center; position: relative; }
+        .col-card-base .col-short { display: block; font-size: 10px; font-weight: 700; line-height: 1.2; }
+        .col-card-base .col-kbd { position: absolute; top: 2px; left: 4px; font-size: 8px; font-weight: 900; color: rgba(100, 116, 139, 0.7); }
+        .col-card-base .col-used { display: block; font-size: 8px; font-weight: 700; color: #64748b; margin-top: 0.125rem; }
+        .col-card-used { opacity: 0.4; cursor: not-allowed; }
+
+        /* Theme: Garment (amber) */
+        .col-group-amber  .col-group-label { color: #b45309; }
+        .col-card-amber   { background: #fef3c7; border-color: #fcd34d; color: #78350f; }
+        .col-card-amber:hover:not(.col-card-used)   { background: #fde68a; }
+        /* Theme: Print (blue) */
+        .col-group-blue   .col-group-label { color: #1d4ed8; }
+        .col-card-blue    { background: #dbeafe; border-color: #93c5fd; color: #1e3a8a; }
+        .col-card-blue:hover:not(.col-card-used)    { background: #bfdbfe; }
+        /* Theme: Direct EMB (stone/cream) */
+        .col-group-stone  .col-group-label { color: #57534e; }
+        .col-card-stone   { background: #f5f5f4; border-color: #d6d3d1; color: #1c1917; }
+        .col-card-stone:hover:not(.col-card-used)   { background: #e7e5e4; }
+        /* Theme: Patch (emerald) */
+        .col-group-emerald .col-group-label { color: #047857; }
+        .col-card-emerald  { background: #d1fae5; border-color: #6ee7b7; color: #064e3b; }
+        .col-card-emerald:hover:not(.col-card-used) { background: #a7f3d0; }
+        /* Theme: Fabric applique (pink) */
+        .col-group-pink   .col-group-label { color: #be185d; }
+        .col-card-pink    { background: #fce7f3; border-color: #f9a8d4; color: #831843; }
+        .col-card-pink:hover:not(.col-card-used)    { background: #fbcfe8; }
+        /* Theme: Heat logo (slate/white) */
+        .col-group-slate  .col-group-label { color: #475569; }
+        .col-card-slate   { background: #f1f5f9; border-color: #cbd5e1; color: #0f172a; }
+        .col-card-slate:hover:not(.col-card-used)   { background: #e2e8f0; }
         .rec-card { transition: all 0.2s; cursor: pointer; }
         .rec-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-color: #fbbf24; }
         .rec-card.selected { background-color: #fffbeb; border-color: #d97706; box-shadow: 0 0 0 2px #fde68a; transform: translateY(-2px); }
@@ -45,6 +100,23 @@
         .crosshair-h { height: 1px; width: 100%; left: 0; }
         .crosshair-v { width: 1px; height: 100%; top: 0; }
         #cropper-container.crosshair-active { cursor: crosshair; }
+
+        /* Manual Record Modal — ใช้ <dialog> + top-layer เพื่อ override stacking context ทั้งหมด */
+        dialog#manualRecordModal {
+            padding: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem;
+            background: #ffffff;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            max-width: 32rem;
+            width: calc(100% - 2rem);
+            color: inherit;
+        }
+        dialog#manualRecordModal::backdrop {
+            background-color: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+        }
+        dialog#manualRecordModal:not([open]) { display: none; }
     </style>
 </head>
 <body class="h-screen flex overflow-hidden text-slate-800">
@@ -78,6 +150,55 @@
 </div>
 
 <datalist id="masterTeamList"></datalist>
+
+<dialog id="manualRecordModal" aria-labelledby="manualRecordTitle">
+    <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+        <h3 class="text-base font-bold text-slate-800 flex items-center"><i class="fa-solid fa-pen-to-square text-indigo-600 mr-2"></i> <span id="manualRecordTitle">เพิ่มข้อมูล Item ด้วยตนเอง</span></h3>
+        <button type="button" onclick="closeManualRecordModal()" class="text-slate-400 hover:text-red-500 transition" title="ปิด"><i class="fa-solid fa-xmark text-xl"></i></button>
+    </div>
+    <div class="p-6 space-y-4">
+        <p class="text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+            <i class="fa-solid fa-circle-info text-amber-600 mr-1"></i>
+            ใช้กรณีระบบอ่านข้อมูลจาก .ai ผิดพลาดหรือไม่ครบ — กรอก ITEM ID แล้วระบบจะแยก Style / CW / ORG CODE ให้อัตโนมัติ
+        </p>
+        <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">ITEM ID <span class="text-red-500">*</span></label>
+            <input type="text" id="mrItemId" placeholder="เช่น 03AZ-2GY-SDN-4EB" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-bold uppercase focus:ring-2 focus:ring-indigo-500 outline-none transition" autocomplete="off">
+            <p class="text-[10px] text-slate-400 mt-1">รูปแบบ: <span class="font-mono font-bold text-slate-600">XXXX-XXX-XXX-XXX</span> (4 ส่วนคั่นด้วย <span class="font-mono font-bold">-</span>)</p>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 mb-1">STYLE (auto)</label>
+                <input type="text" id="mrStyle" readonly class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-600 cursor-not-allowed">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 mb-1">CW (auto)</label>
+                <input type="text" id="mrCw" readonly class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-600 cursor-not-allowed">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 mb-1">ORG CODE (auto)</label>
+                <input type="text" id="mrOrgCode" readonly class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-600 cursor-not-allowed">
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1"><i class="fa-solid fa-users text-slate-400 mr-1"></i> Team Name</label>
+            <input type="text" id="mrTeam" list="masterTeamList" placeholder="เช่น STANFORD" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition" autocomplete="off">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1"><i class="fa-solid fa-palette text-slate-400 mr-1"></i> Fabric Color</label>
+            <input type="text" id="mrColor" placeholder="เช่น 2GY" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition" autocomplete="off">
+        </div>
+        <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1"><i class="fa-solid fa-shirt text-slate-400 mr-1"></i> Fabric (ถ้ามี)</label>
+            <input type="text" id="mrFabric" placeholder="เช่น PHILLY-54%..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition" autocomplete="off">
+        </div>
+        <div id="mrError" class="hidden text-xs text-red-600 font-bold bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+    </div>
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 rounded-b-2xl flex gap-3">
+        <button type="button" onclick="closeManualRecordModal()" class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 font-bold py-2.5 rounded-xl transition shadow-sm">ยกเลิก</button>
+        <button type="button" id="btnSaveManualRecord" onclick="saveManualRecord()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition shadow-md"><i class="fa-solid fa-check mr-1.5"></i> บันทึก</button>
+    </div>
+</dialog>
 
 <div id="loginModal" class="fixed inset-0 bg-slate-900 z-[10000] flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-200">
@@ -350,7 +471,12 @@
             <section id="textDataWorkspace" class="hidden bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center justify-between">
                     <div class="flex items-center"><span class="bg-indigo-100 text-indigo-600 w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">2</span> Extracted Garment Info <span class="text-xs text-slate-500 font-normal ml-2">(ไฟล์ที่กำลังทำอยู่ตอนนี้)</span></div>
-                    <span id="recordCountBadge" class="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold shadow-sm">Found 0 Records</span>
+                    <div class="flex items-center gap-2">
+                        <button id="btnAddManualRecord" type="button" onclick="openManualRecordModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm transition flex items-center" title="เพิ่มข้อมูลด้วยตนเอง (กรณีระบบอ่านผิดพลาดหรือไม่ครบ)">
+                            <i class="fa-solid fa-plus mr-1.5"></i> เพิ่มข้อมูลเอง (Manual)
+                        </button>
+                        <span id="recordCountBadge" class="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full font-bold shadow-sm">Found 0 Records</span>
+                    </div>
                 </h2>
                 <div id="recordCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pb-2"></div>
                 <div id="detectedColorsStrip" class="hidden mt-4 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3">
@@ -447,7 +573,7 @@
                             </div>
                             <div class="mb-4">
                                 <h3 class="text-sm font-bold text-slate-800 mb-2">2. Select Target Column <span class="text-[10px] font-normal text-slate-400 ml-1">(กดแป้น 1-9 เพื่อเลือกได้)</span></h3>
-                                <div id="columnButtonGroup" class="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-2 overflow-y-auto max-h-48 pr-1 py-1"></div>
+                                <div id="columnButtonGroup"></div>
                             </div>
                             <button id="btnAddCrop" class="w-full bg-indigo-600 text-white px-4 py-4 rounded-xl font-bold hover:bg-indigo-700 shadow-md transition flex justify-center items-center mb-4 text-base transform hover:-translate-y-1"><i class="fa-solid fa-scissors mr-2"></i> ตัดรูปส่งเข้า Excel <span class="ml-2 text-xs font-normal opacity-80">(Press Enter)</span></button>
                             <div class="flex flex-col h-32 border-t pt-4">
