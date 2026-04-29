@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     TOKEN_EXPIRE_HOURS: int = 12
     OCR_THRESHOLD: int      = 5      # min blocks → skip next OCR stage
     AI_THRESHOLD: float     = 0.90   # cosine similarity cutoff
-    MAX_UPLOAD_MB: int      = 50     # max file upload size in megabytes
+    MAX_UPLOAD_MB: int      = 500     # max file upload size in megabytes
 
 
 settings = Settings()

@@ -4,11 +4,61 @@
 function showSection(id) { const el = document.getElementById(id); if (el) el.classList.remove("hidden"); }
 function hideSection(id) { const el = document.getElementById(id); if (el) el.classList.add("hidden"); }
 
-function showLoader(text) { 
-    document.getElementById("loaderText").textContent = text; 
-    document.getElementById("fullScreenLoader").classList.remove("hidden"); 
+let loaderTimer = null;
+let loaderStartedAt = 0;
+
+function formatElapsed(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return minutes ? `${minutes}m ${String(seconds).padStart(2, "0")}s` : `${seconds}s`;
 }
-function hideLoader() { document.getElementById("fullScreenLoader").classList.add("hidden"); }
+
+function updateLoader(options = {}) {
+    const textEl = document.getElementById("loaderText");
+    const subtextEl = document.getElementById("loaderSubtext");
+    const detailEl = document.getElementById("loaderDetail");
+    const metaEl = document.getElementById("loaderMeta");
+    const progressWrap = document.getElementById("loaderProgressWrap");
+    const progressBar = document.getElementById("loaderProgressBar");
+
+    if (options.text && textEl) textEl.textContent = options.text;
+    if (options.subtext && subtextEl) subtextEl.textContent = options.subtext;
+    if (options.detail && detailEl) detailEl.textContent = options.detail;
+    if (metaEl) metaEl.classList.toggle("hidden", !options.detail && !loaderStartedAt);
+    if (progressWrap && progressBar && Number.isFinite(options.progress)) {
+        progressWrap.classList.remove("hidden");
+        progressBar.style.width = `${Math.max(0, Math.min(100, options.progress))}%`;
+    }
+}
+
+function showLoader(text, options = {}) {
+    loaderStartedAt = Date.now();
+    document.getElementById("loaderText").textContent = text;
+    document.getElementById("loaderSubtext").textContent = options.subtext || "กรุณารอสักครู่ ระบบกำลังจัดการข้อมูลให้คุณ";
+    document.getElementById("loaderDetail").textContent = options.detail || "";
+    document.getElementById("loaderMeta").classList.toggle("hidden", !options.detail);
+    document.getElementById("loaderProgressWrap").classList.toggle("hidden", !Number.isFinite(options.progress));
+    document.getElementById("loaderProgressBar").style.width = `${Number.isFinite(options.progress) ? options.progress : 0}%`;
+    document.getElementById("fullScreenLoader").classList.remove("hidden");
+
+    clearInterval(loaderTimer);
+    loaderTimer = setInterval(() => {
+        const elapsed = document.getElementById("loaderElapsed");
+        if (elapsed && loaderStartedAt) elapsed.textContent = `Elapsed: ${formatElapsed(Date.now() - loaderStartedAt)}`;
+    }, 1000);
+}
+
+function hideLoader() {
+    clearInterval(loaderTimer);
+    loaderTimer = null;
+    loaderStartedAt = 0;
+    document.getElementById("fullScreenLoader").classList.add("hidden");
+    document.getElementById("loaderProgressWrap").classList.add("hidden");
+    document.getElementById("loaderProgressBar").style.width = "0%";
+    document.getElementById("loaderDetail").textContent = "";
+    document.getElementById("loaderElapsed").textContent = "";
+}
 
 function setBtn(el, loading, loadText = "Processing...") { 
     if (loading) { 

@@ -40,6 +40,55 @@ function getDownloadFilename(res, fallback) {
     return match ? match[1] : fallback;
 }
 
+function formatMergeSize(bytes) {
+    if (!bytes) return "0 MB";
+    const mb = bytes / (1024 * 1024);
+    return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`;
+}
+
+function mergeRequestWithProgress(url, formData, onUploadProgress, onUploadDone) {
+    return new Promise((resolve, reject) => {
+        const token = getAuthToken();
+        if (!token) {
+            logout();
+            reject(new Error("No token found"));
+            return;
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", url);
+        xhr.responseType = "blob";
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) onUploadProgress(event.loaded, event.total);
+        };
+        xhr.upload.onload = () => onUploadDone();
+        xhr.onerror = () => reject(new Error("Network Error"));
+        xhr.onload = async () => {
+            const headers = { get: (name) => xhr.getResponseHeader(name) };
+            if (xhr.status === 401) {
+                logout();
+                reject(new Error("Token expired"));
+                return;
+            }
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve({ ok: true, status: xhr.status, statusText: xhr.statusText, headers, blob: async () => xhr.response });
+                return;
+            }
+
+            let message = xhr.statusText || "Request failed";
+            try {
+                const text = await xhr.response.text();
+                const data = JSON.parse(text);
+                message = data.message || data.detail || message;
+            } catch (_) {}
+            resolve({ ok: false, status: xhr.status, statusText: message, headers, json: async () => ({ message }) });
+        };
+        xhr.send(formData);
+    });
+}
+
 function renderMergeExcelFiles() {
     const baseBadge = document.getElementById("mergeBaseFileName");
     const importBadge = document.getElementById("mergeImportFileCount");
@@ -109,19 +158,69 @@ document.getElementById("btnMergeExcel").addEventListener("click", async () => {
         return;
     }
 
-    showLoader("Merging Excel files...");
+    const totalBytes = [state.mergeExcel.baseFile, ...state.mergeExcel.importFiles]
+        .reduce((sum, file) => sum + (file?.size || 0), 0);
+    const fileCount = 1 + state.mergeExcel.importFiles.length;
+    let phaseTimer = null;
+
+    showLoader("Merging Excel files...", {
+        subtext: "Uploading large workbooks. You can leave this screen open and do other work.",
+        detail: `${fileCount} files selected, total ${formatMergeSize(totalBytes)}.`,
+        progress: 3
+    });
+
     const formData = new FormData();
     formData.append("base_file", state.mergeExcel.baseFile);
     state.mergeExcel.importFiles.forEach(file => formData.append("import_files", file));
 
     try {
-        const res = await fetchWithAuth(`${API_BASE}/merge-excel`, { method: "POST", body: formData });
+        const processingPhases = [
+            "Upload complete. Server is opening the Excel workbooks.",
+            "Reading the first sheet and ITEM_ID values from column D.",
+            "Comparing rows and skipping duplicate ITEM_ID values.",
+            "Copying new rows, styles, formulas, and embedded images.",
+            "Saving the merged workbook and preparing the download."
+        ];
+        let phaseIndex = 0;
+        const startProcessingHints = () => {
+            updateLoader({ subtext: processingPhases[0], detail: "Large files can take several minutes after upload finishes.", progress: 42 });
+            clearInterval(phaseTimer);
+            phaseTimer = setInterval(() => {
+                phaseIndex = Math.min(phaseIndex + 1, processingPhases.length - 1);
+                const elapsedSeconds = Math.floor((Date.now() - loaderStartedAt) / 1000);
+                const progress = Math.min(92, 42 + phaseIndex * 10 + Math.floor(elapsedSeconds / 20));
+                updateLoader({ subtext: processingPhases[phaseIndex], detail: "Please keep this tab open until the download starts.", progress });
+            }, 8000);
+        };
+
+        const res = await mergeRequestWithProgress(
+            `${API_BASE}/merge-excel`,
+            formData,
+            (loaded, total) => {
+                const uploadPercent = Math.round((loaded / total) * 100);
+                updateLoader({
+                    subtext: `Uploading workbooks: ${uploadPercent}% complete.`,
+                    detail: `${formatMergeSize(loaded)} of ${formatMergeSize(total)} sent to server.`,
+                    progress: 5 + Math.round(uploadPercent * 0.32)
+                });
+            },
+            startProcessingHints
+        );
+
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
+            clearInterval(phaseTimer);
+            hideLoader();
             await customAlert(`Merge failed: ${err.message || res.statusText}`, "error");
             return;
         }
 
+        clearInterval(phaseTimer);
+        updateLoader({
+            subtext: "Merge complete. Preparing your download now.",
+            detail: "The browser will start downloading the merged workbook.",
+            progress: 100
+        });
         const added = res.headers.get("X-Merge-Added") || "0";
         const skipped = res.headers.get("X-Merge-Skipped") || "0";
         const errors = res.headers.get("X-Merge-Errors") || "0";
@@ -134,8 +233,11 @@ document.getElementById("btnMergeExcel").addEventListener("click", async () => {
         URL.revokeObjectURL(url);
         setMergeSummary(`Merge complete: added ${added} rows, skipped ${skipped}, errors ${errors}.`);
     } catch (err) {
+        clearInterval(phaseTimer);
+        hideLoader();
         await customAlert(`Backend connection failed. ${err}`, "error");
     } finally {
+        clearInterval(phaseTimer);
         hideLoader();
     }
 });
