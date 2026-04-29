@@ -101,21 +101,30 @@ function renderTextDataCards() {
     const colorEntries = Object.entries(state.currentColors);
     
     state.currentTextData.forEach((rec, idx) => {
-        const safeClass  = rec.source_file.replace(/[^a-zA-Z0-9]/g, "_"); 
+        const sourceFile = rec.source_file || "";
+        const safeClass  = sourceFile.replace(/[^a-zA-Z0-9]/g, "_");
+        const safeSourceJs = escapeJsString(sourceFile);
+        const safeItemId = escapeHtml(rec.item_id || "");
+        const safeStyle = escapeHtml(rec.style || "");
+        const safeCw = escapeHtml(rec.cw || "");
+        const safeOrg = escapeHtml(rec.org_code || "");
+        const safeTeam = escapeHtml(rec.team || "");
+        const safeColor = escapeHtml(rec.color || "");
+        const safeFabric = escapeHtml(rec.fabric || "");
         const isReady = getAllCrops().some(c => c.itemId === rec.item_id);
         const border     = isReady ? "border-2 border-emerald-400 bg-emerald-50" : "border border-slate-200 bg-slate-50";
         const readyBadge = isReady ? `<span class="absolute -top-3 -right-2 bg-emerald-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md"><i class="fa-solid fa-check-circle mr-1"></i>พร้อม Export</span>` : "";
         const ringFocus = isReady ? "focus:ring-emerald-500" : "focus:ring-indigo-500"; 
         const bdr = isReady ? "border-emerald-300" : "border-slate-300";
 
-        const colorDropdownHtml = colorEntries.length 
-            ? `<div id="dd-color-${idx}" class="hidden absolute top-[105%] left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-32 overflow-y-auto">${colorEntries.map(([lbl, val]) => `<div class="px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer border-b border-slate-100 last:border-0" onclick="applyColorDropdown(${idx}, '${val.replace(/'/g,"\\'")}')"><span class="font-bold text-[9px] text-violet-500 mr-1">${lbl}</span> ${val}</div>`).join("")}</div>` 
+        const colorDropdownHtml = colorEntries.length
+            ? `<div id="dd-color-${idx}" class="hidden absolute top-[105%] left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-32 overflow-y-auto">${colorEntries.map(([lbl, val]) => `<div class="px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer border-b border-slate-100 last:border-0" onclick="applyColorDropdown(${idx}, '${escapeJsString(val)}')"><span class="font-bold text-[9px] text-violet-500 mr-1">${escapeHtml(lbl)}</span> ${escapeHtml(val)}</div>`).join("")}</div>`
             : "";
         const dropDownBtn = colorEntries.length 
             ? `<button type="button" class="absolute right-2 top-1.5 w-6 h-6 flex items-center justify-center text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 rounded transition" onclick="toggleColorDropdown(${idx}, event)"><i class="fa-solid fa-chevron-down text-xs"></i></button>` 
             : "";
-        const fabricDisplay = rec.fabric 
-            ? `<span class="text-indigo-600" title="${rec.fabric}">${rec.fabric}</span>` 
+        const fabricDisplay = rec.fabric
+            ? `<span class="text-indigo-600" title="${safeFabric}">${safeFabric}</span>`
             : `<span class="text-slate-300 italic">Not Found</span>`;
 
         const card = document.createElement("div"); 
@@ -130,12 +139,12 @@ function renderTextDataCards() {
             ${deleteBtn}
             <div class="border-b ${isReady ? "border-emerald-200" : "border-slate-200"} pb-2 mb-1 pr-7">
                 <p class="text-xs ${isReady ? "text-emerald-600" : "text-slate-500"} uppercase tracking-wider font-bold">Item ID</p>
-                <p class="font-black ${isReady ? "text-emerald-800" : "text-indigo-700"} text-lg truncate w-full" title="${rec.item_id}">${rec.item_id || "-"}</p>
+                <p class="font-black ${isReady ? "text-emerald-800" : "text-indigo-700"} text-lg truncate w-full" title="${safeItemId}">${safeItemId || "-"}</p>
             </div>
             <div class="grid grid-cols-2 gap-2 text-sm mb-2 bg-white p-2 rounded border ${isReady ? "border-emerald-100" : "border-slate-100"}">
-                <div><p class="text-[10px] text-slate-400">Style</p><p class="font-bold text-slate-700">${rec.style}</p></div>
-                <div><p class="text-[10px] text-slate-400">CW</p><p class="font-bold text-slate-700">${rec.cw}</p></div>
-                <div><p class="text-[10px] text-slate-400">ORG CODE</p><p class="font-bold text-slate-700">${rec.org_code}</p></div>
+                <div><p class="text-[10px] text-slate-400">Style</p><p class="font-bold text-slate-700">${safeStyle}</p></div>
+                <div><p class="text-[10px] text-slate-400">CW</p><p class="font-bold text-slate-700">${safeCw}</p></div>
+                <div><p class="text-[10px] text-slate-400">ORG CODE</p><p class="font-bold text-slate-700">${safeOrg}</p></div>
                 <div class="overflow-hidden"><p class="text-[10px] text-slate-400">FABRIC</p><p class="font-bold text-slate-700 truncate">${fabricDisplay}</p></div>
             </div>
             
@@ -144,13 +153,13 @@ function renderTextDataCards() {
                     <i class="fa-solid fa-users text-slate-400 mr-1"></i> Team Name
                     ${rec.team ? `<span class="ml-1 text-[9px] font-normal text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded"><i class="fa-solid fa-file-lines mr-0.5"></i>จาก .ai</span>` : `<span class="ml-1 text-[9px] font-normal text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>ไม่พบใน .ai</span>`}
                 </label>
-                <input type="text" class="team-sync-${safeClass} w-full border ${bdr} ${ringFocus} rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 outline-none transition" value="${rec.team}" oninput="syncTeamName(this.value, '${rec.source_file}')" placeholder="ไม่พบ Team Name ใน .ai — พิมพ์เองได้...">
+                <input type="text" class="team-sync-${safeClass} w-full border ${bdr} ${ringFocus} rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 outline-none transition" value="${safeTeam}" oninput="syncTeamName(this.value, '${safeSourceJs}')" placeholder="ไม่พบ Team Name ใน .ai — พิมพ์เองได้...">
             </div>
 
             <div class="mt-auto relative">
                 <label class="text-xs font-bold text-slate-700 block mb-1"><i class="fa-solid fa-palette text-slate-400 mr-1"></i> Fabric Color</label>
                 <div class="relative">
-                    <input type="text" id="color-input-${idx}" class="w-full pr-8 border ${bdr} ${ringFocus} rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 outline-none transition" value="${rec.color}" onchange="updateRecordField(${idx}, 'color', this.value)" placeholder="สำหรับใส่สี Colorway">
+                    <input type="text" id="color-input-${idx}" class="w-full pr-8 border ${bdr} ${ringFocus} rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 outline-none transition" value="${safeColor}" onchange="updateRecordField(${idx}, 'color', this.value)" placeholder="สำหรับใส่สี Colorway">
                     ${dropDownBtn}${colorDropdownHtml}
                 </div>
             </div>`;
@@ -190,6 +199,7 @@ function renderArtboardGallery() {
     container.innerHTML = "";
     
     state.currentArtboards.forEach((ab, idx) => {
+        const safeSource = escapeHtml(ab.source_file || "");
         const count = state.currentMappedCrops.filter(c => c.artboardIndex === idx).length; 
         const isDone = state.manualCompletedArtboards.includes(idx);
         
@@ -220,7 +230,7 @@ function renderArtboardGallery() {
             </div>
             <div class="w-full text-center flex flex-col">
                 <h4 class="text-sm font-bold ${isDone ? 'text-emerald-800' : (count > 0 ? 'text-indigo-800' : 'text-slate-800')} line-clamp-1">Artboard ${ab.artboard_number}</h4>
-                <span class="text-[9px] ${isDone ? 'text-emerald-600' : 'text-slate-500'} truncate" title="${ab.source_file}">${ab.source_file}</span>
+                <span class="text-[9px] ${isDone ? 'text-emerald-600' : 'text-slate-500'} truncate" title="${safeSource}">${safeSource}</span>
             </div>`;
         card.onclick = () => openCropperWorkspace(idx); 
         container.appendChild(card);
@@ -234,13 +244,15 @@ function renderAvailableRecords() {
     
     state.currentTextData.forEach((rec, i) => {
         const display = rec.color || "⚠️ รอใส่สี"; 
+        const safeDisplay = escapeHtml(display);
+        const safeItemId = escapeHtml(rec.item_id || "");
         const btn = document.createElement("div");
         btn.className = `rec-card border bg-white rounded-lg p-2 flex flex-col items-start text-left relative ${!rec.color ? "border-orange-200" : "border-slate-200"}`;
         if (previouslySelected.includes(rec.item_id)) btn.classList.add("selected");
         
         btn.dataset.itemid = rec.item_id; 
         btn.dataset.color  = display;
-        btn.innerHTML = `<span class="absolute top-1 left-2 text-[10px] font-black text-amber-500">${i + 1}</span><span class="font-bold text-amber-700 text-xs w-full truncate mt-2" title="${display}">${display}</span><span class="text-[9px] text-slate-400 w-full truncate" title="${rec.item_id}">${rec.item_id}</span>`;
+        btn.innerHTML = `<span class="absolute top-1 left-2 text-[10px] font-black text-amber-500">${i + 1}</span><span class="font-bold text-amber-700 text-xs w-full truncate mt-2" title="${safeDisplay}">${safeDisplay}</span><span class="text-[9px] text-slate-400 w-full truncate" title="${safeItemId}">${safeItemId}</span>`;
         
         btn.onclick = () => { 
             btn.classList.toggle("selected"); 
@@ -334,17 +346,21 @@ function renderMappedItems() {
         const item = document.createElement("div");
         item.className = "flex items-center gap-2 bg-white border border-slate-200 p-1.5 rounded shadow-sm group";
         const shortLabel = getColumnShortLabel(crop.col) || `Col ${crop.col}`;
+        const safeShortLabel = escapeHtml(shortLabel);
+        const safeColorDesc = escapeHtml(crop.colorDesc || "");
+        const safeColName = escapeHtml(crop.colName || "");
+        const safeFilename = escapeJsString(crop.filename || "");
         item.innerHTML = `
             <div class="w-8 h-8 bg-slate-100 rounded overflow-hidden flex-shrink-0 border border-slate-200 flex items-center justify-center">
                 <img src="${crop.previewUrl}" class="max-w-full max-h-full">
             </div>
             <div class="flex-1 min-w-0">
-                <p class="text-[10px] font-bold text-indigo-600 truncate" title="${crop.colName || ''}">${shortLabel} <span class="text-amber-600">(${crop.colorDesc})</span></p>
+                <p class="text-[10px] font-bold text-indigo-600 truncate" title="${safeColName}">${safeShortLabel} <span class="text-amber-600">(${safeColorDesc})</span></p>
             </div>
-            <button class="text-slate-300 hover:text-indigo-600 transition px-1 opacity-50 group-hover:opacity-100" onclick="editCrop('${crop.filename}')" title="แก้ไขกรอบรูปนี้ (Edit)">
+            <button class="text-slate-300 hover:text-indigo-600 transition px-1 opacity-50 group-hover:opacity-100" onclick="editCrop('${safeFilename}')" title="แก้ไขกรอบรูปนี้ (Edit)">
                 <i class="fa-solid fa-pen-to-square text-xs"></i>
             </button>
-            <button class="text-slate-300 hover:text-red-500 transition px-1 opacity-50 group-hover:opacity-100" onclick="deleteCrop('${crop.filename}')" title="ลบถาวร">
+            <button class="text-slate-300 hover:text-red-500 transition px-1 opacity-50 group-hover:opacity-100" onclick="deleteCrop('${safeFilename}')" title="ลบถาวร">
                 <i class="fa-solid fa-trash text-xs"></i>
             </button>`;
         list.appendChild(item);

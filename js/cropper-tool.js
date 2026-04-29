@@ -40,7 +40,7 @@ window.openCropperWorkspace = (index) => {
     cropArea.classList.remove("hidden");
     document.body.style.overflow = "hidden";
 
-    document.getElementById("artboardDisplay").innerHTML = `Artboard ${ab.artboard_number} <span class="text-xs text-slate-400 font-normal ml-2">(${ab.source_file})</span>`;
+    document.getElementById("artboardDisplay").innerHTML = `Artboard ${ab.artboard_number} <span class="text-xs text-slate-400 font-normal ml-2">(${escapeHtml(ab.source_file || "")})</span>`;
     
     hideSection("detectedObjectsPanel"); 
     const dObjList = document.getElementById("detectedObjectsList"); 
@@ -176,7 +176,7 @@ async function runAutoDetect(ab) {
                             const conf = Math.round(pData.confidence * 100);
                             // อัปเดต UI ถ้า AI เดาถูก
                             predBadge.className = "absolute -top-2 -right-2 bg-violet-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-md border border-white";
-                            predBadge.innerHTML = `${pData.label} <span class="text-[7px] text-violet-200">${conf}%</span>`;
+                            predBadge.innerHTML = `${escapeHtml(pData.label)} <span class="text-[7px] text-violet-200">${conf}%</span>`;
                             
                             // เก็บข้อมูลไว้ใน dataset ของปุ่ม
                             btn.dataset.predictedCol = pData.label;

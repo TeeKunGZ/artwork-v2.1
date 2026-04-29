@@ -131,8 +131,10 @@ document.getElementById("btnGenerateExcel").addEventListener("click", async () =
     
     finalTextData.forEach(rec => {
         const itemCrops = finalCrops.filter(c => c.itemId === rec.item_id);
-        const colBadgesHtml = itemCrops.length > 0 
-            ? itemCrops.sort((a,b) => a.col.localeCompare(b.col)).map(c => `<span class="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 rounded shadow-sm text-[10px] text-slate-600 mr-1.5 mb-1.5" title="${state.columnHeaders[c.col] || ''}"><span class="font-black text-indigo-600">${c.col}</span>${state.columnHeaders[c.col] ? `<span class="truncate max-w-[120px] text-slate-400 font-medium">${state.columnHeaders[c.col]}</span>` : ''}</span>`).join('') 
+        const safeItemId = escapeHtml(rec.item_id || "");
+        const safeColor = escapeHtml(rec.color || '- รอระบุ -');
+        const colBadgesHtml = itemCrops.length > 0
+            ? itemCrops.sort((a,b) => a.col.localeCompare(b.col)).map(c => `<span class="inline-flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 rounded shadow-sm text-[10px] text-slate-600 mr-1.5 mb-1.5" title="${escapeHtml(state.columnHeaders[c.col] || '')}"><span class="font-black text-indigo-600">${escapeHtml(c.col)}</span>${state.columnHeaders[c.col] ? `<span class="truncate max-w-[120px] text-slate-400 font-medium">${escapeHtml(state.columnHeaders[c.col])}</span>` : ''}</span>`).join('')
             : '<span class="text-slate-300 italic text-xs">ไม่มีรูป</span>';
             
         const isMissingColor = !rec.color || rec.color.trim() === ""; 
@@ -146,8 +148,8 @@ document.getElementById("btnGenerateExcel").addEventListener("click", async () =
             if (isMissingCrops) errs.push("ขาดรูป"); 
             statusHtml = `<span class="bg-red-100 text-red-700 px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap"><i class="fa-solid fa-triangle-exclamation"></i> ${errs.join(', ')}</span>`; 
         }
-        const fabricDisplay = rec.fabric ? `<div class="text-indigo-600 font-medium truncate max-w-[150px]" title="${rec.fabric}">${rec.fabric}</div>` : `<div class="text-slate-300 italic">- ไม่พบ -</div>`;
-        html += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition"><td class="p-3 font-bold text-indigo-700 align-top">${rec.item_id}</td><td class="p-3 ${isMissingColor ? 'text-red-500 italic' : 'text-slate-700'} align-top">${rec.color || '- รอระบุ -'}</td><td class="p-3 align-top">${fabricDisplay}</td><td class="p-3 font-medium text-slate-600 align-top flex flex-wrap pt-3.5">${colBadgesHtml}</td><td class="p-3 text-center align-top pt-3.5">${statusHtml}</td></tr>`;
+        const fabricDisplay = rec.fabric ? `<div class="text-indigo-600 font-medium truncate max-w-[150px]" title="${escapeHtml(rec.fabric)}">${escapeHtml(rec.fabric)}</div>` : `<div class="text-slate-300 italic">- ไม่พบ -</div>`;
+        html += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition"><td class="p-3 font-bold text-indigo-700 align-top">${safeItemId}</td><td class="p-3 ${isMissingColor ? 'text-red-500 italic' : 'text-slate-700'} align-top">${safeColor}</td><td class="p-3 align-top">${fabricDisplay}</td><td class="p-3 font-medium text-slate-600 align-top flex flex-wrap pt-3.5">${colBadgesHtml}</td><td class="p-3 text-center align-top pt-3.5">${statusHtml}</td></tr>`;
     });
     
     html += `</tbody></table></div>`;

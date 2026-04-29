@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 
-async def get_current_user(
+async def get_authenticated_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -32,6 +32,14 @@ async def get_current_user(
 
     return {c.name: getattr(user, c.name) for c in user.__table__.columns
             if c.name != "password_hash"}
+
+
+async def get_current_user(
+    current_user: dict = Depends(get_authenticated_user),
+) -> dict:
+    if current_user.get("must_change_password"):
+        raise HTTPException(status_code=403, detail="password_change_required")
+    return current_user
 
 
 async def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:

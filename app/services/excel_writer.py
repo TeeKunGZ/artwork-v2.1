@@ -28,6 +28,8 @@ from openpyxl.drawing.xdr import XDRPositiveSize2D
 from openpyxl.utils import column_index_from_string
 from PIL import Image as PILImage
 
+from app.services.columns import IMAGE_COL_LETTERS, normalize_image_col
+
 TEMPLATE_PATH  = "Templates.xlsx"
 FIRST_DATA_ROW = 2
 _EMU_PER_PX    = 9525
@@ -76,16 +78,6 @@ _TEXT_COLS = {
     "team":     7,
     "color":    13,
 }
-
-_IMAGE_COL_LETTERS = {
-    "N",
-    "R",  "T",  "V",  "X",
-    "Z",  "AB", "AD", "AF",
-    "AH", "AL",
-    "AP", "AS",
-    "AV", "AX", "AZ",
-}
-
 
 def _col_emu(sheet, col_letter: str) -> int:
     """Column width (character units) → EMU.  Calibri 11 / 96 DPI.
@@ -146,11 +138,12 @@ def generate_excel_bytes(
     records: list[dict],
     crops: list[tuple[str, bytes]],
     mappings: dict,
+    template_bytes: bytes | None = None,
 ) -> bytes:
-    if not os.path.exists(TEMPLATE_PATH):
+    if template_bytes is None and not os.path.exists(TEMPLATE_PATH):
         raise FileNotFoundError("ไม่พบไฟล์ Templates.xlsx")
 
-    wb    = openpyxl.load_workbook(io.BytesIO(_get_template_bytes()))
+    wb    = openpyxl.load_workbook(io.BytesIO(template_bytes or _get_template_bytes()))
     try:
         sheet = wb.active
 
@@ -185,10 +178,10 @@ def generate_excel_bytes(
                 continue
             map_info          = mappings[fname]
             item_id           = str(map_info["item_id"]).strip()
-            target_col_letter = map_info["col"]
+            target_col_letter = normalize_image_col(map_info["col"])
             if item_id not in row_map:
                 continue
-            if target_col_letter not in _IMAGE_COL_LETTERS:
+            if target_col_letter not in IMAGE_COL_LETTERS:
                 print(f"[ExcelWriter] Skipped col {target_col_letter}: ไม่อยู่ใน image column list")
                 continue
             target_row = row_map[item_id]

@@ -189,3 +189,52 @@ dialog#manualRecordModal::backdrop {
 - `js/state.js` — COLUMN_GROUPS + getColumnShortLabel
 - `js/ui.js` — renderAvailableColumns + renderMappedItems
 - `index.html` — CSS block (themes + grid) + container markup
+---
+
+## 2026-04-29 (Core+Safe bug fixes)
+
+### Scope
+Implemented the Core+Safe plan for main workflow reliability:
+login -> upload template/artwork -> OCR -> crop/auto detect -> save memory/dataset -> export Excel/ZIP -> admin.
+
+### Changes Applied
+- Excel export now uses uploaded `excel_file` bytes first, preserving user workbook data, and falls back to server `Templates.xlsx` only when no upload is supplied.
+- Added shared backend image column definitions in `app/services/columns.py`; backend now accepts `AJ` and `AN` to match frontend `COLUMN_GROUPS`.
+- Hardened `/api/save-dataset`: rejects unknown/path-traversal labels, normalizes labels, validates ITEM ID, keeps writes under `dataset/` and `history_db/`, and applies `MAX_UPLOAD_MB`.
+- Hardened `/api/auto_detect`: applies `MAX_UPLOAD_MB`, returns HTTP errors for invalid input, and handles grayscale fallback safely.
+- Enforced `must_change_password`: `/api/me` and `/api/users/me/password` remain available, other protected endpoints return `403 detail=password_change_required`, and password change clears the flag.
+- Frontend now opens change-password modal before loading workspace when required.
+- Added escaping helpers and escaped major dynamic frontend rendering paths: dialogs, record cards, artboard labels, export preview, AI monitor, upload filenames, and AI prediction labels.
+- Added focused unittest coverage in `tests/test_core_safe.py`.
+
+### Verification
+- `python -m unittest tests.test_core_safe` -> OK (3 tests)
+- `python -m py_compile server.py app\config.py app\dependencies.py app\db\base.py app\db\crud.py app\routers\auth.py app\routers\core.py app\routers\export.py app\services\columns.py app\services\excel_writer.py` -> OK
+- `node --check ...` could not run because `node` is not installed/in PATH on this machine.
+
+### Notes
+- Did not touch pre-existing deleted files from git status: `icon-removebg-preview (1).png`, `icon11.png`, `icon22.png`.
+
+---
+
+## 2026-04-29 (Merge Excel Files workspace)
+
+### Scope
+Implemented an in-app Merge Excel Files workspace from the left side menu.
+
+### Changes Applied
+- Added `/api/merge-excel` with authenticated upload handling for one base `.xlsx` and multiple import `.xlsx` files.
+- Added `app/services/excel_merger.py` to merge first sheets only, using column `D` ITEM_ID as the row key, skipping duplicates and blank IDs.
+- Merge output keeps the base workbook as the template, appends new rows, copies row values/styles/row height, and copies embedded images anchored to imported rows.
+- Added `js/merge-excel.js`, merge state, sidebar navigation, and an in-app workspace for base/import uploads, queue display, merge download, and summary.
+- Added focused tests in `tests/test_excel_merger.py`.
+
+### Verification
+- `python -m unittest discover -s tests` -> OK (8 tests)
+- `python -m py_compile server.py app\config.py app\dependencies.py app\db\base.py app\db\crud.py app\routers\auth.py app\routers\core.py app\routers\export.py app\services\columns.py app\services\excel_writer.py app\services\excel_merger.py` -> OK
+- `git diff --check` -> OK, only LF/CRLF warnings.
+- `node --check js\merge-excel.js` could not run because `node` is not installed/in PATH.
+
+### Notes
+- `python -m unittest` alone discovers 0 tests in this repo; use `python -m unittest discover -s tests`.
+- Did not touch pre-existing deleted files from git status: `icon-removebg-preview (1).png`, `icon11.png`, `icon22.png`.

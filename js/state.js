@@ -58,7 +58,8 @@ const state = {
     currentArtboards: [], currentTextData: [], currentMappedCrops: [], currentFileName: "", currentColors: {},
     cropper: null, activeArtboardIndex: null, cmPerPx: 0, isColorLocked: false,
     globalCropMemory: {}, sessionCropMemory: {}, pendingEditCrop: null, manualCompletedArtboards: [],
-    crosshairEnabled: false, aiAbortController: null, useAiMode: true
+    crosshairEnabled: false, aiAbortController: null, useAiMode: true,
+    mergeExcel: { baseFile: null, importFiles: [] }
 };
 
 // =============================================================================

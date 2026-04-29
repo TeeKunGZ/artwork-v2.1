@@ -87,6 +87,7 @@ def set_password(db: Session, emp_id: str, new_password: str) -> bool:
     if not user:
         return False
     user.password_hash = get_password_hash(new_password)
+    user.must_change_password = 0
     db.commit()
     return True
 

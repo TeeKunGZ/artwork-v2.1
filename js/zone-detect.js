@@ -322,7 +322,7 @@ window.runZoneDetect = async (ab) => {
                         if (pData.status === "success" && pData.label !== "Unknown") {
                             const conf = Math.round(pData.confidence * 100);
                             predBadge.className = "absolute -top-2 -right-2 bg-violet-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-md border border-white";
-                            predBadge.innerHTML = `${pData.label} <span class="text-[7px] text-violet-200">${conf}%</span>`;
+                            predBadge.innerHTML = `${escapeHtml(pData.label)} <span class="text-[7px] text-violet-200">${conf}%</span>`;
                             btn.dataset.predictedCol  = pData.label;
                             btn.dataset.predictedConf = conf;
                         } else {

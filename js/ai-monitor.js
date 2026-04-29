@@ -100,12 +100,12 @@ const AI_MONITOR = (() => {
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            <span class="text-xs font-bold text-slate-700 leading-none">${m.label}</span>
+                            <span class="text-xs font-bold text-slate-700 leading-none">${escapeHtml(m.label)}</span>
                             <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full ${cfg.badge}">${cfg.label}</span>
                             ${durationHtml}${countHtml}
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-0.5 truncate leading-tight" title="${m.message || m.description}">
-                            ${m.message || m.description}
+                        <p class="text-[10px] text-slate-400 mt-0.5 truncate leading-tight" title="${escapeHtml(m.message || m.description)}">
+                            ${escapeHtml(m.message || m.description)}
                         </p>
                     </div>
                 `;

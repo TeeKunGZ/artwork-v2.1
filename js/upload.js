@@ -88,7 +88,7 @@ document.getElementById("excelFile").addEventListener("change", async (e) => {
     const icon   = document.getElementById("excelIcon");
     const status = document.getElementById("autoLoadStatus");
 
-    badge.innerHTML = `<i class="fa-solid fa-check mr-1"></i> ${file.name}`;
+    badge.innerHTML = `<i class="fa-solid fa-check mr-1"></i> ${escapeHtml(file.name)}`;
     badge.classList.remove("hidden");
     document.getElementById("excelTitle").textContent = "Template Uploaded";
     status.textContent = "อัปโหลดทับไฟล์ Template เดิมสำเร็จ";
@@ -113,7 +113,7 @@ document.getElementById("aiFiles").addEventListener("change", (e) => {
     const icon  = document.getElementById("aiIcon");
     const title = document.getElementById("aiTitle");
 
-    span.innerHTML = `<i class="fa-solid fa-check mr-1"></i> ${file.name}`;
+    span.innerHTML = `<i class="fa-solid fa-check mr-1"></i> ${escapeHtml(file.name)}`;
     span.classList.remove("hidden");
     title.textContent = "Artwork Ready";
 
@@ -198,7 +198,7 @@ document.getElementById("btnStart").addEventListener("click", async () => {
 
         aiInput.value = "";
         const aiSpan = document.getElementById("aiFileName");
-        aiSpan.innerHTML = `<i class="fa-solid fa-file-import mr-1"></i> ดึง ${aiFileName} ขึ้นจอแล้ว`;
+        aiSpan.innerHTML = `<i class="fa-solid fa-file-import mr-1"></i> ดึง ${escapeHtml(aiFileName)} ขึ้นจอแล้ว`;
         aiSpan.className = "text-sm font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full text-center inline-block";
     } catch (err) {
         await customAlert("Cannot connect to server. " + err, "error");

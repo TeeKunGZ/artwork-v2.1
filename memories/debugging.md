@@ -6,6 +6,31 @@
 
 ## Domain-Specific Pitfalls
 
+### Excel image columns must share one backend constant
+**Modules:** `app/services/columns.py`, `app/services/excel_writer.py`, `app/routers/core.py`
+
+Frontend `COLUMN_GROUPS` includes 18 image columns:
+`N, R, T, V, X, Z, AB, AD, AF, AH, AJ, AL, AN, AP, AS, AV, AX, AZ`.
+
+Do not keep separate ad hoc backend lists. Use `IMAGE_COL_LETTERS` from
+`app/services/columns.py` for export and dataset/history validation. If the UI
+adds a template image column, update this shared backend constant and add a
+focused export test.
+
+### Export must preserve uploaded workbook bytes
+**Modules:** `app/routers/export.py`, `app/services/excel_writer.py`
+
+`/api/generate-excel` receives `excel_file` from the frontend. Use those bytes
+as the workbook source first so user-uploaded template data is preserved. Only
+fall back to server `Templates.xlsx` when no upload is supplied.
+
+### Dataset/history writes need path validation
+**Module:** `app/routers/core.py` -> `/api/save-dataset`
+
+Never use request `label` directly as a directory name. Normalize it as an image
+column, verify it is in `IMAGE_COL_LETTERS`, validate ITEM ID, and resolve child
+paths under `dataset/` and `history_db/` before writing files.
+
 ### ⚠️ ITEM ID Deduplication — ห้ามใช้ `fuzz.ratio` กับ ID ที่ share suffix
 **Module:** `app/services/parser.py` → `parse_item_records()`
 
@@ -191,3 +216,19 @@ python -c "import os; print(os.path.exists('.env'))"
 - **Database:** `artportal.db` (SQLite)
 - **Uploads:** `./uploads/` directory
 - **Exports:** `./exports/` directory
+
+## Excel Merge Issues
+
+### 1. Merge output missing imported rows
+- Check imported workbook first sheet and confirm ITEM_ID exists in column `D`, starting at row 2.
+- Blank ITEM_ID rows and duplicate ITEM_ID rows are intentionally skipped.
+- Use the response headers `X-Merge-Added`, `X-Merge-Skipped`, and `X-Merge-Errors` to confirm behavior.
+
+### 2. Merge output missing images
+- Images are copied only when the image anchor starts on the copied source row.
+- Floating images or images anchored to header/blank rows may not be copied.
+- OpenPyXL image anchors are most reliable after saving and reloading the workbook.
+
+### 3. Unit test discovery
+- `python -m unittest` currently discovers 0 tests in this repo.
+- Use `python -m unittest discover -s tests` for the full local suite.

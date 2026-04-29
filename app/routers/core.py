@@ -12,12 +12,13 @@ import io
 import json
 import os
 import re
+from pathlib import Path
 
 import cv2
 import fitz
 import numpy as np
 import openpyxl
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image as PILImage
 from sqlalchemy.orm import Session
@@ -29,6 +30,7 @@ from app.services.ocr_pipeline import extract_text_blocks
 from app.services.parser import parse_item_records, _clean
 from app.services.ai_status import get_registry, ModuleState
 from app.config import settings
+from app.services.columns import IMAGE_COL_LETTERS, normalize_image_col
 import time
 import uuid
 
@@ -37,6 +39,15 @@ router = APIRouter(tags=["Core"])
 HISTORY_DIR = "history_db"
 DATASET_DIR = "dataset"
 MAX_UPLOAD_BYTES = settings.MAX_UPLOAD_MB * 1024 * 1024
+ITEM_ID_SAFE_PATTERN = re.compile(r"^[A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+-[A-Z0-9]+$")
+
+
+def _safe_child_dir(base_dir: str, child_name: str) -> Path:
+    base = Path(base_dir).resolve()
+    target = (base / child_name).resolve()
+    if target != base and base not in target.parents:
+        raise ValueError("Invalid path")
+    return target
 
 
 # ── Template download ─────────────────────────────────────────────────────────
@@ -125,6 +136,9 @@ async def extract_ai_image(
         auto_mapped = []
         if os.path.isdir(HISTORY_DIR):
             for col_dir in os.listdir(HISTORY_DIR):
+                col_dir = normalize_image_col(col_dir)
+                if col_dir not in IMAGE_COL_LETTERS:
+                    continue
                 col_path = os.path.join(HISTORY_DIR, col_dir)
                 if not os.path.isdir(col_path):
                     continue
@@ -196,11 +210,15 @@ async def auto_detect_objects(
 
     try:
         contents = await file.read()
+        if len(contents) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_MB} MB",
+            )
         nparr    = np.frombuffer(contents, np.uint8)
         img_orig = cv2.imdecode(nparr, cv2.IMREAD_UNCHANGED)
         if img_orig is None:
-            raise ValueError("อ่านไฟล์ภาพไม่ได้")
-
+            raise HTTPException(status_code=400, detail="Unable to read image file")
         h_img, w_img = img_orig.shape[:2]
 
         # ── แปลงเป็น BGR เสมอ สำหรับ GrabCut ──────────────────────────────
@@ -230,7 +248,7 @@ async def auto_detect_objects(
                                255, 0).astype(np.uint8)
         except Exception:
             # GrabCut fail → fallback ใช้ alpha หรือ Canny เหมือนเดิม
-            if img_orig.shape[2] == 4:
+            if img_orig.ndim == 3 and img_orig.shape[2] == 4:
                 fg_mask = img_orig[:, :, 3]
             else:
                 gray    = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
@@ -280,10 +298,14 @@ async def auto_detect_objects(
 
         return {"status": "success", "objects": result}
 
+    except HTTPException:
+        elapsed = int((time.time() - start) * 1000)
+        reg.update("cv2_detect", ModuleState.ERROR, "Invalid image input", duration_ms=elapsed)
+        raise
     except Exception as exc:
         elapsed = int((time.time() - start) * 1000)
         reg.update("cv2_detect", ModuleState.ERROR, str(exc), duration_ms=elapsed)
-        return {"status": "error", "message": str(exc)}
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── Crop memory ───────────────────────────────────────────────────────────────
@@ -309,24 +331,38 @@ async def save_dataset(
 ):
     try:
         content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is {settings.MAX_UPLOAD_MB} MB",
+            )
+
+        label = normalize_image_col(label)
+        if label not in IMAGE_COL_LETTERS:
+            raise HTTPException(status_code=400, detail="Invalid dataset label")
+
+        item_id = (item_id or "").strip().upper()
+        if item_id and not ITEM_ID_SAFE_PATTERN.fullmatch(item_id):
+            raise HTTPException(status_code=400, detail="Invalid ITEM ID")
 
         # Persist to dataset/<label>/ for AI training
-        class_dir = os.path.join(DATASET_DIR, label)
-        os.makedirs(class_dir, exist_ok=True)
+        class_dir = _safe_child_dir(DATASET_DIR, label)
+        class_dir.mkdir(parents=True, exist_ok=True)
         fname = f"crop_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}.png"
-        with open(os.path.join(class_dir, fname), "wb") as f:
+        with open(class_dir / fname, "wb") as f:
             f.write(content)
 
         # Persist to history_db/<label>/<item_id>.png for auto-mapping on re-upload
         if item_id:
-            hist_dir = os.path.join(HISTORY_DIR, label)
-            os.makedirs(hist_dir, exist_ok=True)
-            safe_id = item_id.replace("/", "_").replace("\\", "_")
-            with open(os.path.join(hist_dir, f"{safe_id}.png"), "wb") as f:
+            hist_dir = _safe_child_dir(HISTORY_DIR, label)
+            hist_dir.mkdir(parents=True, exist_ok=True)
+            with open(hist_dir / f"{item_id}.png", "wb") as f:
                 f.write(content)
 
         return {"status": "success"}
 
+    except HTTPException:
+        raise
     except Exception as exc:
         return JSONResponse(
             status_code=400,

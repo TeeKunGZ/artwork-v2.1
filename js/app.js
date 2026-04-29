@@ -7,10 +7,8 @@ window.addEventListener("load", async () => {
         try {
             const res = await fetchWithAuth("/api/me");
             if (res.ok) {
-                setupUserProfile(await res.json());
+                handlePostLogin(await res.json());
                 document.getElementById("loginModal").classList.add("hidden");
-                loadMasterTeamsForMapping(); 
-                autoLoadTemplate(); 
             } else logout();
         } catch (e) { logout(); }
     } else document.getElementById("loginModal").classList.remove("hidden");

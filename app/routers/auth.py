@@ -14,7 +14,7 @@ from app.db.crud import (
     verify_password,
     set_password,
 )
-from app.dependencies import get_current_user
+from app.dependencies import get_authenticated_user
 
 router = APIRouter(tags=["Auth"])
 
@@ -50,7 +50,7 @@ async def login(
 
 
 @router.get("/me")
-async def read_me(current_user: dict = Depends(get_current_user)):
+async def read_me(current_user: dict = Depends(get_authenticated_user)):
     return current_user
 
 
@@ -58,7 +58,7 @@ async def read_me(current_user: dict = Depends(get_current_user)):
 async def change_own_password(
     old_password: str = Form(...),
     new_password: str = Form(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_authenticated_user),
     db: Session = Depends(get_db),
 ):
     if len(new_password) < 8:
